@@ -8,8 +8,10 @@ import type {
   ProductStats,
 } from "../types/product";
 
+const apiBaseUrl = (import.meta.env.VITE_API_URL || "/api").replace(/\/+$/, "");
+
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: apiBaseUrl,
   timeout: 60000,
   withCredentials: true,
 });

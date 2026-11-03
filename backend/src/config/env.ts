@@ -10,9 +10,13 @@ dotenv.config({ path: path.resolve(backendRoot, ".env") });
 const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS ?? "";
 
 export const env = {
-  port: Number(process.env.PORT ?? 4000),
+  port: Number(process.env.PORT ?? 10000),
+  host: process.env.HOST ?? "0.0.0.0",
   nodeEnv: process.env.NODE_ENV ?? "development",
-  frontendOrigin: process.env.FRONTEND_ORIGIN ?? "http://localhost:5173",
+  frontendOrigins: (process.env.FRONTEND_ORIGIN ?? "http://localhost:5173")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   appPassword: process.env.APP_PASSWORD ?? (process.env.NODE_ENV === "production" ? "" : "3456"),
   spreadsheetId:
     process.env.GOOGLE_SPREADSHEET_ID ??

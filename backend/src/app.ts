@@ -39,7 +39,13 @@ export function createApp() {
   );
   app.use(
     cors({
-      origin: env.frontendOrigin,
+      origin: (origin, callback) => {
+        if (!origin || env.frontendOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+        callback(null, false);
+      },
       credentials: true,
     }),
   );
@@ -59,8 +65,24 @@ export function createApp() {
   app.use("/api/health", healthRouter);
   app.use("/api/auth", authRouter);
   app.use("/api", requireSession);
+  app.use("/api", (req, res, next) => {
+    if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+      const origin = req.header("origin");
+      if (origin && !env.frontendOrigins.includes(origin)) {
+        res.status(403).json({
+          success: false,
+          error: { message: "İstek kaynağına izin verilmiyor.", code: "ORIGIN_FORBIDDEN" },
+        });
+        return;
+      }
+    }
+    next();
+  });
   app.use("/api/products", productsRouter);
   app.use("/api/categories", categoriesRouter);
+  app.get("/health", (_req, res) => {
+    res.json({ success: true, data: { api: true } });
+  });
   if (env.nodeEnv === "production") {
     app.use(express.static(frontendDist));
     app.get("*", (req, res, next) => {

@@ -7,12 +7,15 @@ const app = createApp();
 if (env.nodeEnv === "production" && env.appPassword.length < 4) {
   throw new Error("Canlı ortamda APP_PASSWORD en az 4 karakter olmalıdır.");
 }
-if (env.nodeEnv === "production" && (!process.env.FRONTEND_ORIGIN || env.frontendOrigin === "*")) {
-  throw new Error("Canlı ortamda FRONTEND_ORIGIN için uygulamanızın tam HTTPS adresini tanımlayın.");
+if (
+  env.nodeEnv === "production" &&
+  (!env.frontendOrigins.length || env.frontendOrigins.some((origin) => !origin.startsWith("https://")))
+) {
+  throw new Error("Canlı ortamda FRONTEND_ORIGIN için Vercel uygulamanızın HTTPS adresini tanımlayın.");
 }
 
-app.listen(env.port, async () => {
-  console.log(`Backend http://localhost:${env.port}`);
+app.listen(env.port, env.host, async () => {
+  console.log(`Backend ${env.host}:${env.port}`);
   if (!hasGoogleCredentials()) {
     console.warn("Google servis hesabı tanımlı değil. backend/.env dosyasını doldurun.");
     return;

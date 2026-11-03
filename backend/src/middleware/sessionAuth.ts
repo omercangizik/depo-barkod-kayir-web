@@ -10,7 +10,8 @@ function cookieOptions() {
   return {
     httpOnly: true,
     secure: env.nodeEnv === "production",
-    sameSite: "strict" as const,
+    // Vercel and Render use different origins; None is required for credentialed API requests.
+    sameSite: env.nodeEnv === "production" ? "none" as const : "strict" as const,
     path: "/",
     maxAge: SESSION_TTL_MS,
   };

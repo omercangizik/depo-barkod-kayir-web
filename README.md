@@ -1,198 +1,141 @@
 # Öztürk Ambalaj Deposu
 
-Barkodlu ürün kayıt sistemi.
-
-Ambalaj deposundaki ürünleri telefon veya bilgisayar kamerasıyla barkod okutarak kaydeden, Google Sheets üzerinde saklayan mobil uyumlu web uygulaması.
+Barkodla ürün arama ve Google Sheets üzerinde ürün kaydı için mobil uyumlu web uygulaması.
 
 ## Özellikler
 
-- Kamera ile barkod okuma (EAN-13, EAN-8, UPC-A, UPC-E, Code 128, Code 39, QR)
-- Manuel barkod arama
-- Yeni ürün ekleme ve mevcut ürün düzenleme
-- Boş alanların dolu bilgileri silmemesi; alan temizleme
-- Ürün listesi, arama, kategori ve eksik bilgi filtresi
-- Excel içe / dışa aktarma
-- Verilerin Google Sheets üzerinde tutulması
+- Telefon kamerasıyla barkod okuma ve manuel barkod/ürün arama
+- Ürün ekleme, güncelleme, listeleme ve kategori yönetimi
+- Excel içe/dışa aktarma
+- Ürün verilerini Google Sheets üzerinde saklama
+
+## Proje yapısı
+
+- `frontend/`: React + Vite arayüzü (Vercel)
+- `backend/`: Express API ve Google Sheets bağlantısı (Render)
+- `render.yaml`: Render Blueprint yapılandırması
+- `frontend/vercel.json`: istemci tarafı yönlendirmeleri
 
 ## Gereksinimler
 
-- Node.js 20 veya üzeri
-- Google Cloud servis hesabı (Sheets API açık)
-- Verilen Google Sheets belgesine düzenleyici erişimi
+- Node.js 22
+- Google Sheets API etkin bir Google Cloud projesi
+- Google Sheet üzerinde Düzenleyici erişimi olan servis hesabı
 
-Spreadsheet ID: `10KCbcRYIWy3uKwlYiViCww8EqEyCUg70W5yVca3AkBU`
+## Yerel geliştirme
 
-## Kurulum
+1. Bağımlılıkları yükleyin:
 
-### 1. Bağımlılıklar
+   ```bash
+   npm run install:all
+   ```
+
+2. `backend/.env.example` dosyasını `backend/.env` olarak kopyalayın ve Google servis hesabı e-posta/özel anahtarını girin. `frontend/.env.example` dosyasını da `frontend/.env` olarak kopyalayın.
+3. Geliştirme sunucularını çalıştırın:
+
+   ```bash
+   npm run dev
+   ```
+
+   Arayüz `http://localhost:5173`, API `http://localhost:10000` adreslerinde çalışır.
+
+Kamera erişimi HTTPS veya localhost gerektirir. Telefonda yerel ağ üzerinden kamera denemek için `frontend/.env` içinde `VITE_DEV_HTTPS=true` yapıp sunucuyu yeniden başlatın; tarayıcı sertifika uyarısını kabul edin. Kamera kullanılamazsa manuel barkod araması yapılabilir.
+
+## Google Sheets hazırlığı
+
+1. Google Cloud Console'da projeyi seçin ve **Google Sheets API**'yi etkinleştirin.
+2. **APIs & Services → Credentials** bölümünden servis hesabı oluşturun ve JSON anahtarını indirin.
+3. JSON içindeki `client_email` hesabını hedef Google Sheet ile **Düzenleyici** olarak paylaşın.
+4. Canlı dağıtımda anahtarı dosya olarak yüklemeyin; Render servisinin `GOOGLE_SERVICE_ACCOUNT_EMAIL` ve `GOOGLE_PRIVATE_KEY` değişkenlerine girin.
+
+Google Sheet kimlik bilgilerini Vercel'e veya Git deposuna koymayın. `.env.example` dosyaları yalnızca değişken adları ve örnek değer içerir. Sağlık kontrolü `/api/health` Google Sheets API'ye salt okunur bir `spreadsheets.get` isteği yapar; satır, başlık veya kategori yazmaz/silmez. Uygulamanın normal ürün ve kategori işlemleri ise Google Sheet'i günceller.
+
+## Test ve derleme
 
 Proje kökünde:
 
 ```bash
-npm install
-npm run install:all
-```
-
-### 2. Ortam dosyaları
-
-`backend/.env.example` dosyasını `backend/.env` olarak kopyalayın.
-
-`frontend/.env.example` dosyasını `frontend/.env` olarak kopyalayın.
-
-Uygulama, personelin ortak kullandığı tek bir `APP_PASSWORD` ile giriş yapar. Varsayılan şifre `3456`'dır; bu parola yalnızca backend ortamında tutulur.
-
-### 3. Google servis hesabı
-
-Mevcut tablo verileri silinmez. Uygulama başlarken `Urunler` ve `Kategoriler` sayfalarını yoksa oluşturur, eksik kolon başlıklarını ekler, varsayılan ana kategorileri tamamlar.
-
-1. [Google Cloud Console](https://console.cloud.google.com/) içinde bir proje seçin veya oluşturun.
-2. **APIs & Services → Library** üzerinden **Google Sheets API** ürününü etkinleştirin.
-3. **APIs & Services → Credentials → Create credentials → Service account** ile servis hesabı oluşturun.
-4. Servis hesabı için JSON anahtar indirin. Dosyayı `backend/google-credentials.json` olarak kaydedin (bu dosya Git'e gitmez).
-5. JSON içindeki `client_email` değerini kopyalayın.
-6. Google Sheets belgesini bu e-posta ile **Düzenleyici** olarak paylaşın:
-   https://docs.google.com/spreadsheets/d/10KCbcRYIWy3uKwlYiViCww8EqEyCUg70W5yVca3AkBU/edit
-
-`backend/.env` örneği:
-
-```env
-PORT=4000
-NODE_ENV=development
-FRONTEND_ORIGIN=http://localhost:5173
-APP_PASSWORD=3456
-GOOGLE_SPREADSHEET_ID=10KCbcRYIWy3uKwlYiViCww8EqEyCUg70W5yVca3AkBU
-GOOGLE_APPLICATION_CREDENTIALS=./google-credentials.json
-```
-
-JSON dosyası kullanmak istemezseniz e-posta ve özel anahtarı `.env` içine yazabilirsiniz:
-
-```env
-GOOGLE_SERVICE_ACCOUNT_EMAIL=servis-hesabi@proje.iam.gserviceaccount.com
-GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-```
-
-### 4. Mevcut tabloyu inceleme
-
-```bash
-npm run inspect-sheets --prefix backend
-```
-
-Bu komut sayfa adlarını ve ürün sayısını yazdırır; mevcut satırları silmez.
-
-### 5. Geliştirme sunucuları
-
-```bash
-npm run dev
-```
-
-- Frontend: http://localhost:5173
-- Backend: http://localhost:4000
-- Sağlık kontrolü: http://localhost:4000/api/health
-
-Sağlık kontrolü `sheets: true` dönene kadar Google bağlantısı tamamlanmış sayılmaz.
-
-## Telefon kamerası
-
-Tarayıcı kamera erişimi için güvenli köken (HTTPS veya localhost) gerekir.
-
-Aynı ağdaki telefonla denemek için `frontend/.env` içine şunu yazın:
-
-```env
-VITE_DEV_HTTPS=true
-```
-
-Ardından `npm run dev` ile yeniden başlatın. Tarayıcıdaki kendi imzalı sertifikayı bir kez kabul etmeniz gerekir.
-
-Kamera izni verilmezse barkod ekranındaki manuel arama kullanılır.
-
-## Kullanım
-
-1. Ana sayfada **Barkod Okut**.
-2. Barkod okutulur veya yazılır.
-3. Kayıt varsa düzenleme formu, yoksa yeni ürün formu açılır.
-4. Zorunlu alanlar: Barkod No, Ürün Adı, Ana Kategori.
-5. Kaydet yalnızca değişen veya yeni girilen alanları günceller.
-6. Bir alanı silmek için **Alanı temizle** kullanın.
-7. Excel aktarımında kolonları eşleştirip onaylayın. Boş hücreler mevcut veriyi silmez.
-
-## API
-
-| Metod | Yol | Açıklama |
-| --- | --- | --- |
-| GET | `/api/health` | API ve Sheets bağlantı durumu (hassas Sheet bilgisi döndürmez) |
-| POST | `/api/auth/login` | Uygulama parolasıyla güvenli oturum açma |
-| GET | `/api/products` | Ürün listesi (`search`, `category`, `incomplete`, `page`, `limit`) |
-| GET | `/api/products/stats` | Özet sayılar |
-| GET | `/api/products/barcode/:barcode` | Barkod ile ürün |
-| POST | `/api/products` | Yeni ürün |
-| PUT | `/api/products/barcode/:barcode` | Güncelleme (`updates`, `clearFields`) |
-| POST | `/api/products/import/preview` | Excel önizleme |
-| POST | `/api/products/import` | Excel aktarımı |
-| GET | `/api/products/export` | Excel indirme |
-| GET | `/api/categories` | Kategoriler |
-| POST | `/api/categories` | Alt kategori ekleme |
-
-Ürün ve kategori uçları, `HttpOnly`, `SameSite=Strict` oturum çerezi ile korunur. Oturum açma denemeleri sınırlıdır.
-
-## Yayına alma
-
-1. Google kimlik bilgilerini sunucu ortam değişkenlerine yazın. JSON dosyasını repoya koymayın.
-2. `APP_PASSWORD` ortak giriş şifresini backend ortamında ayarlayın. `FRONTEND_ORIGIN` değerini uygulamanızın tam HTTPS adresi yapın.
-3. Üretimi derleyin:
-
-```bash
-npm run install:all
+npm test
 npm run build
 ```
 
-4. `NODE_ENV=production` ile backend'i başlatın:
+Backend testleri Render'ın kullanacağı `/health` uç noktasını, oturum korumasını ve oturum durumunu Google Sheets'e bağlanmadan denetler. Google bağlantısını deploy sonrası ayrıca `https://<render-servis-adı>.onrender.com/api/health` adresinden doğrulayın; `sheets: true` başarılı erişim anlamına gelir. Bu kontrol tablo verilerini değiştirmez.
 
-```bash
-npm start
-```
+## Vercel + Render ile canlıya alma
 
-Üretimde backend `frontend/dist` dosyalarını da sunar. Kamera için HTTPS zorunludur.
+Önce depoyu GitHub'a gönderin, sonra Render backend'i oluşturun. Render servis URL'si netleştikten sonra Vercel ortam değişkenine ekleyin. Vercel'in oluşturduğu frontend URL'sini alın ve Render'daki `FRONTEND_ORIGIN` değerini bu tam adrese göre ayarlayın. İki servisteki ortam değişkeni değişikliklerinden sonra yeniden deploy edin.
 
-### Ortam değişkenleri (üretim)
+### Render paneli (backend)
 
-```env
-PORT=4000
-NODE_ENV=production
-FRONTEND_ORIGIN=https://sizin-alan-adiniz.com
-APP_PASSWORD=3456
-GOOGLE_SPREADSHEET_ID=10KCbcRYIWy3uKwlYiViCww8EqEyCUg70W5yVca3AkBU
-GOOGLE_SERVICE_ACCOUNT_EMAIL=...
-GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-```
+1. Render'da **New → Blueprint** ile GitHub deposunu bağlayıp kökteki `render.yaml` dosyasını seçin. Oluşan web servisini inceleyip oluşturun. Alternatif olarak **New → Web Service** kullanıp aşağıdaki ayarları elle girin.
+2. Servis ayarları:
 
-`GOOGLE_PRIVATE_KEY` satır sonlarını `\n` olarak saklayın.
+   | Alan | Değer |
+   | --- | --- |
+   | Root Directory | `backend` |
+   | Runtime | Node |
+   | Build Command | `npm ci --include=dev && npm run build` |
+   | Start Command | `npm start` |
+   | Health Check Path | `/health` |
+   | Node version | `22` (`backend/.node-version`) |
 
-### Önerilen barındırma
+   Render, web servisini dış trafiğe açmak için `0.0.0.0` üzerinde dinlemeyi ve `PORT` ortam değişkenini kullanmayı bekler; backend bunları otomatik kullanır. Blueprint'te PORT değerini ayrıca girmeyin.
 
-- Tek süreç: Railway, Render, Fly.io veya bir VPS
-- Önünde Nginx / Caddy ile HTTPS
-- Frontend ayrı barındırılırsa API isteklerini `/api` yoluna yönlendirin
+3. **Environment → Environment Variables** alanına şunları ekleyin:
 
-### Netlify ile yayınlama
+   | Key | Value |
+   | --- | --- |
+   | `NODE_ENV` | `production` |
+   | `APP_PASSWORD` | Şirket içinde paylaşacağınız uygulama parolası |
+   | `FRONTEND_ORIGIN` | Vercel URL'niz, ör. `https://ozturk-ambalaj.vercel.app` |
+   | `GOOGLE_SPREADSHEET_ID` | Kullanılacak Google Sheet kimliği |
+   | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Servis hesabının `client_email` değeri |
+   | `GOOGLE_PRIVATE_KEY` | JSON anahtarındaki `private_key` değeri; `\n` satır sonları korunmalı |
 
-Bu proje Netlify'de statik frontend, ayrı bir Node.js servisinde backend olarak çalışır. Netlify hesabınıza Git deposunu bağlayın; `netlify.toml` build komutunu ve yayın klasörünü ayarlar. Backend'i Render, Railway veya bir VPS üzerinde ayrıca yayınlayın.
+   `FRONTEND_ORIGIN` içinde yalnızca origin girin (protokol + alan adı, sonunda `/` veya sayfa yolu olmadan). Vercel Preview adreslerini de kullanacaksanız, gereken tam HTTPS originleri virgülle ayırın. `APP_PASSWORD` için güçlü ve tahmin edilmesi zor bir parola belirleyin; üretimde örnek/development parolası `3456` kullanmayın. Bu değerler yalnızca Render'da tutulur.
 
-Netlify ortam değişkenlerine `API_BACKEND_URL` olarak backend'in HTTPS origin adresini yazın (ör. `https://depo-api.onrender.com`). Netlify build'i `/api/*` isteklerini backend'e proxy eden yönlendirmeyi üretir. Backend ortam değişkenlerinde `FRONTEND_ORIGIN` değerini Netlify sitenizin adresi olarak ayarlayın; `APP_PASSWORD` ve Google Sheets kimlik bilgileri yalnızca backend'de saklanmalıdır.
+4. İlk deploy başarılı olunca Render'ın verdiği servis adresini not edin; sonraki bölümde Vercel'e gireceksiniz.
 
-Netlify dağıtımında `API_BACKEND_URL` tanımlı değilse build hata verir; böylece backend'e bağlanmayan bir canlı sürüm yayınlanmaz. Netlify ortam değişkenleri yalnızca frontend build'i için, backend gizli ayarları ise backend servisinin panelinde tanımlanmalıdır.
+### Vercel paneli (frontend)
 
-## Güvenlik
+1. Vercel'de **Add New → Project** ile aynı GitHub deposunu içe aktarın.
+2. Proje ayarları:
 
-- Servis hesabı anahtarı yalnızca backend `.env` veya gizli dosyada durur.
-- `.env` ve `google-credentials.json` Git'e eklenmez.
-- Excel yüklemesi 10 MB, XLSX dosya türü, 10.000 satır, 100 sütun ve sıkıştırılmış dosya boyutu denetimleriyle sınırlandırılmıştır.
-- Uygulama tek ortak `APP_PASSWORD` ile oturum açar; ayrı kullanıcı veya rol yönetimi yoktur.
-- Barkod bazlı kilit, aynı barkodun eşzamanlı yazılmasını engeller.
+   | Alan | Değer |
+   | --- | --- |
+   | Root Directory | `frontend` |
+   | Framework Preset | Vite |
+   | Install Command | `npm ci --include=dev` |
+   | Build Command | `npm run build` |
+   | Output Directory | `dist` |
+   | Node.js Version | `22.x` |
 
-## Proje yapısı
+3. `frontend/vercel.json` bu install/build/output ayarlarını da içerir. **Settings → Environment Variables** bölümünde aşağıdaki değişkeni Production ve Preview için (Preview'ı kullanacaksanız) tanımlayın:
 
-```
-frontend/   React + Vite arayüz
-backend/    Express API ve Google Sheets
-README.md
-```
+   | Key | Value |
+   | --- | --- |
+   | `VITE_API_URL` | `https://<render-servis-adı>.onrender.com/api` |
+
+   Bu değişken frontend derlemesine dahil edilir ve gizli bilgi içermemelidir. `APP_PASSWORD` veya Google anahtarlarını Vercel'e eklemeyin. Kaydedince Vercel'de redeploy başlatın.
+
+4. Vercel deployment URL'nizi alın, Render'daki `FRONTEND_ORIGIN` değerine yazın ve Render'ı yeniden deploy edin. Vercel'de özel alan adı bağlarsanız onu da `FRONTEND_ORIGIN` listesine ekleyin.
+
+### Yayın sonrası kontrol
+
+1. `https://<render-servis-adı>.onrender.com/health` → `{"success":true,"data":{"api":true}}` beklenir. Bu yalnızca backend'in çalıştığını doğrular.
+2. `https://<render-servis-adı>.onrender.com/api/health` → `data.sheets: true` beklenir. Bu Google Sheets erişimini salt okunur biçimde kontrol eder.
+3. Vercel adresinde oturum açmayı, manuel ürün aramayı, izin verildiyse kamera taramasını ve bir ürün kaydını deneyin. Gerçek ürün kaydı Google Sheet'i değiştirir; canlı kontrol için önce test ürünü kullanın ve gerekirse sonradan kendiniz kaldırın.
+
+## Uygulama kullanımı
+
+1. Barkodu kamerayla okutun veya manuel olarak arayın.
+2. Ürün bulunursa mevcut alanları düzenleyin; bulunmazsa yeni kayıt açılır.
+3. Kayıt için Barkod No, Ürün Adı ve Ana Kategori gereklidir.
+4. Excel aktarımında dosyadaki kolonları eşleştirip önizlemeyi kontrol edin.
+
+## Güvenlik ve gizli dosyalar
+
+- `.env`, `.env.*` (örnek dosyalar dışında), `google-credentials.json` ve servis hesabı anahtarı Git dışında tutulur.
+- Google kimlik bilgileri yalnızca Render backend ortamında saklanır.
+- Uygulama tek ortak parola ile oturum açar; ayrı kullanıcı/rol yönetimi yoktur.
+- Canlıya almadan önce `git status` ve `git ls-files` ile anahtar veya `.env` dosyalarının repoya eklenmediğini kontrol edin. Daha önce GitHub'a anahtar yüklendiyse dosyayı silmek yeterli değildir; servis hesabı anahtarını Google Cloud Console'dan iptal edip yenisini oluşturun.
