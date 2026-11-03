@@ -2,8 +2,6 @@ import cors from "cors";
 import express from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { env } from "./config/env.js";
 import { requireSession } from "./middleware/sessionAuth.js";
 import { authRouter } from "./routes/auth.js";
@@ -11,9 +9,6 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { categoriesRouter } from "./routes/categories.js";
 import { healthRouter } from "./routes/health.js";
 import { productsRouter } from "./routes/products.js";
-
-const here = path.dirname(fileURLToPath(import.meta.url));
-const frontendDist = path.resolve(here, "../../frontend/dist");
 
 export function createApp() {
   const app = express();
@@ -83,16 +78,6 @@ export function createApp() {
   app.get("/health", (_req, res) => {
     res.json({ success: true, data: { api: true } });
   });
-  if (env.nodeEnv === "production") {
-    app.use(express.static(frontendDist));
-    app.get("*", (req, res, next) => {
-      if (req.path.startsWith("/api")) {
-        next();
-        return;
-      }
-      res.sendFile(path.join(frontendDist, "index.html"));
-    });
-  }
   app.use(notFoundHandler);
   app.use(errorHandler);
   return app;

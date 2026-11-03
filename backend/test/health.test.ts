@@ -27,6 +27,15 @@ describe("HTTP readiness and API access", () => {
     assert.deepEqual(await response.json(), { success: true, data: { api: true } });
   });
 
+  it("does not try to serve the Vercel frontend from the Render API service", async () => {
+    const response = await fetch(`${baseUrl}/`);
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), {
+      success: false,
+      error: { message: "İstenen kaynak bulunamadı", code: "NOT_FOUND" },
+    });
+  });
+
   it("keeps product API routes behind the server-side session", async () => {
     const response = await fetch(`${baseUrl}/api/products/stats`);
     assert.equal(response.status, 401);
