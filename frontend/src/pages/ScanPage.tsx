@@ -62,6 +62,9 @@ export function ScanPage() {
   const [zoomValue, setZoomValue] = useState(1);
   const [manual, setManual] = useState("");
   const [barcodeTarget, setBarcodeTarget] = useState<"barkodNo" | "koliDisBarkodNo">("barkodNo");
+  const [innerBarcode, setInnerBarcode] = useState("");
+  const [outerBarcode, setOuterBarcode] = useState("");
+  const [openingForm, setOpeningForm] = useState(false);
   const [matches, setMatches] = useState<{ barkodNo: string; koliDisBarkodNo: string; urunAdi: string; anaKategori: string }[]>([]);
   const [searching, setSearching] = useState(false);
   const [status, setStatus] = useState("Kamera bağlanıyor...");
@@ -69,31 +72,17 @@ export function ScanPage() {
   const navigate = useNavigate();
 
   const handleCode = useCallback(
-    async (raw: string) => {
+    (raw: string) => {
       const code = raw.trim();
-      if (!code || busyRef.current || code === lastCodeRef.current) return;
-      busyRef.current = true;
+      if (!code || code === lastCodeRef.current) return;
       lastCodeRef.current = code;
       setError("");
-      setStatus(`Barkod okundu: ${code}. Kayıt aranıyor...`);
+      if (barcodeTarget === "koliDisBarkodNo") setOuterBarcode(code);
+      else setInnerBarcode(code);
+      setStatus(`${barcodeTarget === "koliDisBarkodNo" ? "Koli dış barkodu" : "Ürün/iç barkodu"} okundu: ${code}. Diğer barkodu da okutabilir veya ürün ekranına geçebilirsiniz.`);
       if (navigator.vibrate) navigator.vibrate(80);
-      try {
-        await apiClient.getByBarcode(code);
-        navigate(`/products/${encodeURIComponent(code)}`);
-      } catch (err) {
-        const message = getErrorMessage(err);
-        if (message.toLocaleLowerCase("tr-TR").includes("bulunamadı")) {
-          const params = new URLSearchParams({ barcode: code, barcodeField: barcodeTarget });
-          navigate(`/products/new?${params.toString()}`);
-        } else {
-          setError(message);
-          setStatus("Barkod okundu ancak ürün aranamadı. Bağlantıyı kontrol edip tekrar deneyin.");
-          busyRef.current = false;
-          lastCodeRef.current = "";
-        }
-      }
     },
-    [barcodeTarget, navigate],
+    [barcodeTarget],
   );
 
   useEffect(() => {
@@ -256,8 +245,9 @@ export function ScanPage() {
         return;
       }
       if (/^\d+$/.test(query)) {
-        const params = new URLSearchParams({ barcode: query, barcodeField: barcodeTarget });
-        navigate(`/products/new?${params.toString()}`);
+        if (barcodeTarget === "koliDisBarkodNo") setOuterBarcode(query);
+        else setInnerBarcode(query);
+        setStatus(`${barcodeTarget === "koliDisBarkodNo" ? "Koli dış barkodu" : "Ürün/iç barkodu"} alana eklendi. Diğer barkodu girebilir veya ürün ekranına geçebilirsiniz.`);
         return;
       }
       setStatus("Bu adla eşleşen bir ürün bulunamadı.");
@@ -267,6 +257,35 @@ export function ScanPage() {
     } finally {
       busyRef.current = false;
       setSearching(false);
+    }
+  }
+
+  async function openProductForm() {
+    setError("");
+    setOpeningForm(true);
+    const inner = innerBarcode.trim();
+    const outer = outerBarcode.trim();
+    try {
+      for (const code of [inner, outer].filter(Boolean)) {
+        try {
+          const response = await apiClient.getByBarcode(code);
+          const params = new URLSearchParams();
+          if (inner) params.set("innerBarcode", inner);
+          if (outer) params.set("outerBarcode", outer);
+          navigate(`/products/${encodeURIComponent(response.data.data.barkodNo)}${params.size ? `?${params}` : ""}`);
+          return;
+        } catch (err) {
+          if (!getErrorMessage(err).toLocaleLowerCase("tr-TR").includes("bulunamadı")) throw err;
+        }
+      }
+      const params = new URLSearchParams();
+      if (inner) params.set("innerBarcode", inner);
+      if (outer) params.set("outerBarcode", outer);
+      navigate(`/products/new${params.size ? `?${params}` : ""}`);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setOpeningForm(false);
     }
   }
 
@@ -305,7 +324,7 @@ export function ScanPage() {
       </div>
       <p className="text-sm text-slate-600" aria-live="polite">{status}</p>
       <fieldset className="rounded-xl bg-white p-3 shadow-sm">
-        <legend className="px-1 text-sm font-medium text-slate-700">Yeni okutulan barkod hangi alana yazılsın?</legend>
+        <legend className="px-1 text-sm font-medium text-slate-700">Kamerayla okutulacak barkod türü</legend>
         <div className="grid grid-cols-2 gap-2">
           {([
             ["barkodNo", "Ürün / iç barkod"],
@@ -323,6 +342,19 @@ export function ScanPage() {
           ))}
         </div>
       </fieldset>
+      <section className="space-y-3 rounded-xl bg-white p-4 shadow-sm">
+        <p className="text-sm text-slate-600">İki barkod türünü de okutun veya elle girin. İkisinden biri yeterliyse diğerini boş bırakabilirsiniz.</p>
+        <label className="block text-sm font-medium text-slate-700" htmlFor="inner-barcode">Ürün / iç barkod</label>
+        <input id="inner-barcode" value={innerBarcode} onChange={(event) => setInnerBarcode(event.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3" placeholder="Ürün barkodunu okutun veya yazın" inputMode="numeric" autoComplete="off" />
+        <label className="block text-sm font-medium text-slate-700" htmlFor="outer-barcode">Koli dış barkodu</label>
+        <input id="outer-barcode" value={outerBarcode} onChange={(event) => setOuterBarcode(event.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3" placeholder="Koli barkodunu okutun veya yazın" inputMode="numeric" autoComplete="off" />
+        <button type="button" onClick={() => void openProductForm()} disabled={openingForm} className="w-full rounded-xl bg-navy py-3 font-semibold text-white disabled:opacity-60">
+          {openingForm ? "Ürün aranıyor..." : "Ürün kaydına geç"}
+        </button>
+        <button type="button" onClick={() => { setInnerBarcode(""); setOuterBarcode(""); lastCodeRef.current = ""; setStatus("Barkod alanları temizlendi. Kamerayla okutabilir veya elle girebilirsiniz."); }} className="w-full rounded-xl border border-slate-300 py-2.5 text-sm font-medium text-slate-700">
+          Barkod alanlarını temizle
+        </button>
+      </section>
       <div className="flex flex-col gap-2 sm:flex-row">
         <select
           aria-label="Kamera seç"

@@ -19,7 +19,8 @@ export function ProductFormPage({ mode }: { mode: "create" | "edit" }) {
       const scannedField = params.get("barcodeField") === "koliDisBarkodNo"
         ? "koliDisBarkodNo"
         : "barkodNo";
-      initial[scannedField] = params.get("barcode") ?? "";
+      initial.barkodNo = params.get("innerBarcode") ?? (scannedField === "barkodNo" ? params.get("barcode") : null) ?? "";
+      initial.koliDisBarkodNo = params.get("outerBarcode") ?? (scannedField === "koliDisBarkodNo" ? params.get("barcode") : null) ?? "";
       setProduct(initial);
       setError("");
       return () => {
@@ -37,7 +38,14 @@ export function ProductFormPage({ mode }: { mode: "create" | "edit" }) {
     apiClient
       .getByBarcode(barcode)
       .then((res) => {
-        if (!ignore) setProduct(res.data.data);
+        if (!ignore) {
+          const loaded = { ...res.data.data };
+          const scannedInner = params.get("innerBarcode") ?? "";
+          const scannedOuter = params.get("outerBarcode") ?? "";
+          if (!loaded.barkodNo && scannedInner) loaded.barkodNo = scannedInner;
+          if (!loaded.koliDisBarkodNo && scannedOuter) loaded.koliDisBarkodNo = scannedOuter;
+          setProduct(loaded);
+        }
       })
       .catch((err) => {
         if (!ignore) setError(getErrorMessage(err));
