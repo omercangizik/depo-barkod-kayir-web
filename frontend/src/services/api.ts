@@ -13,18 +13,7 @@ const apiBaseUrl = (import.meta.env.VITE_API_URL || "/api").replace(/\/+$/, "");
 const api = axios.create({
   baseURL: apiBaseUrl,
   timeout: 60000,
-  withCredentials: true,
-});
-
-api.interceptors.response.use(undefined, (error: unknown) => {
-  if (
-    axios.isAxiosError(error) &&
-    error.response?.status === 401 &&
-    !String(error.config?.url ?? "").startsWith("/auth/")
-  ) {
-    window.dispatchEvent(new Event("depo:session-expired"));
-  }
-  return Promise.reject(error);
+  withCredentials: false,
 });
 
 export function getErrorMessage(err: unknown): string {
@@ -39,9 +28,6 @@ export function getErrorMessage(err: unknown): string {
 }
 
 export const apiClient = {
-  login: (password: string) => api.post("/auth/login", { password }),
-  session: () => api.get<{ success: boolean; data: { authenticated: boolean } }>("/auth/session"),
-  logout: () => api.post("/auth/logout"),
   health: () => api.get("/health"),
   stats: () => api.get<{ success: boolean; data: ProductStats }>("/products/stats"),
   products: (params: Record<string, string | number | boolean>) =>

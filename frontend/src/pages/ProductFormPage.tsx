@@ -9,14 +9,17 @@ export function ProductFormPage({ mode }: { mode: "create" | "edit" }) {
   const { barcode } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const [product, setProduct] = useState<Product | null>(mode === "create" ? emptyProduct() : null);
+  const [product, setProduct] = useState<Product | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let ignore = false;
     if (mode === "create") {
       const initial = emptyProduct();
-      initial.barkodNo = params.get("barcode") ?? "";
+      const scannedField = params.get("barcodeField") === "koliDisBarkodNo"
+        ? "koliDisBarkodNo"
+        : "barkodNo";
+      initial[scannedField] = params.get("barcode") ?? "";
       setProduct(initial);
       setError("");
       return () => {

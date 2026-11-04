@@ -1,5 +1,6 @@
 export const PRODUCT_FIELDS = [
   "barkodNo",
+  "koliDisBarkodNo",
   "urunAdi",
   "anaKategori",
   "altKategori",
@@ -44,7 +45,8 @@ export const DEFAULT_CATEGORIES = [
 export type Product = Record<ProductField, string> & { rowNumber?: number };
 
 export const FIELD_LABELS: Record<ProductField, string> = {
-  barkodNo: "Barkod No",
+  barkodNo: "Ürün / İç Barkod No",
+  koliDisBarkodNo: "Koli Dış Barkod No",
   urunAdi: "Ürün Adı",
   anaKategori: "Ana Kategori",
   altKategori: "Alt Kategori",

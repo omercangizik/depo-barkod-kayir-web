@@ -9,6 +9,7 @@ const optionalNumberLike = z
 
 export const productSchema = z.object({
   barkodNo: z.string().min(1, "Barkod No zorunludur"),
+  koliDisBarkodNo: optionalText,
   urunAdi: z.string().min(1, "Ürün adı zorunludur"),
   anaKategori: z.string().min(1, "Ana kategori zorunludur"),
   altKategori: optionalText,

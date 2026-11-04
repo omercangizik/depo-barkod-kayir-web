@@ -6,8 +6,6 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "./config/env.js";
-import { requireSession } from "./middleware/sessionAuth.js";
-import { authRouter } from "./routes/auth.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { categoriesRouter } from "./routes/categories.js";
 import { healthRouter } from "./routes/health.js";
@@ -64,8 +62,6 @@ export function createApp() {
     }),
   );
   app.use("/api/health", healthRouter);
-  app.use("/api/auth", authRouter);
-  app.use("/api", requireSession);
   app.use("/api", (req, res, next) => {
     if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
       const origin = req.header("origin");

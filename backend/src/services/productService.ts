@@ -79,6 +79,7 @@ export async function listProducts(query: {
     filtered = filtered.filter(
       (p) =>
         p.barkodNo.toLocaleLowerCase("tr-TR").includes(search) ||
+        p.koliDisBarkodNo.toLocaleLowerCase("tr-TR").includes(search) ||
         p.urunAdi.toLocaleLowerCase("tr-TR").includes(search),
     );
   }
@@ -116,13 +117,14 @@ export async function getStats() {
 export async function findByBarcode(barcode: string) {
   const code = normalizeBarcode(barcode);
   const all = await readAllProducts();
-  return all.find((p) => p.barkodNo === code) ?? null;
+  return all.find((p) => p.barkodNo === code || p.koliDisBarkodNo === code) ?? null;
 }
 
 export async function createProduct(input: Record<string, unknown>) {
   const parsed = productSchema.parse({
     ...input,
     barkodNo: normalizeBarcode(input.barkodNo),
+    koliDisBarkodNo: normalizeBarcode(input.koliDisBarkodNo),
     urunAdi: String(input.urunAdi ?? "").trim(),
     anaKategori: String(input.anaKategori ?? "").trim(),
   });
@@ -130,9 +132,12 @@ export async function createProduct(input: Record<string, unknown>) {
     const error = validateNumericField(field, String(parsed[field] ?? ""));
     if (error) throw new AppError(error, 400, "VALIDATION_ERROR");
   }
+  if (parsed.koliDisBarkodNo && parsed.koliDisBarkodNo === parsed.barkodNo) {
+    throw new AppError("Ürün/iç barkod ile koli dış barkodu farklı olmalıdır", 400, "VALIDATION_ERROR");
+  }
   return withBarcodeLock(parsed.barkodNo, () =>
     withSheetLock(async () => {
-      const existing = await findByBarcode(parsed.barkodNo);
+      const existing = await findByBarcode(parsed.barkodNo) ?? (parsed.koliDisBarkodNo ? await findByBarcode(parsed.koliDisBarkodNo) : null);
       if (existing) {
         throw new ConflictError("Bu barkod ile kayıtlı bir ürün zaten var");
       }
@@ -172,6 +177,12 @@ export async function updateProduct(
       const existing = await findByBarcode(code);
       if (!existing) throw new NotFoundError("Bu barkod ile ürün bulunamadı");
       const merged = mergeProduct(existing, updates, clearFields);
+      for (const value of [merged.barkodNo, merged.koliDisBarkodNo].filter(Boolean)) {
+        const collision = await findByBarcode(value);
+        if (collision && collision.rowNumber !== existing.rowNumber) {
+          throw new ConflictError("Bu barkod başka bir üründe kayıtlı");
+        }
+      }
       if (isBlank(merged.urunAdi) || isBlank(merged.anaKategori) || isBlank(merged.barkodNo)) {
         throw new AppError("Barkod, ürün adı ve ana kategori boş bırakılamaz", 400, "VALIDATION_ERROR");
       }
@@ -194,7 +205,11 @@ export type ImportError = {
 export async function importProducts(rows: ImportRow[]) {
   return withSheetLock(async () => {
     const existing = await readAllProducts(true);
-    const byBarcode = new Map(existing.map((p) => [p.barkodNo, p]));
+    const byBarcode = new Map<string, ProductRecord>();
+    for (const product of existing) {
+      if (product.barkodNo) byBarcode.set(product.barkodNo, product);
+      if (product.koliDisBarkodNo) byBarcode.set(product.koliDisBarkodNo, product);
+    }
     const toUpdate: ProductRecord[] = [];
     const toCreate: ProductRecord[] = [];
     const errors: ImportError[] = [];
@@ -208,7 +223,9 @@ export async function importProducts(rows: ImportRow[]) {
         continue;
       }
       const barkodNo = normalizeBarcode(row.barkodNo);
-      if (barkodNo && seenInFile.has(barkodNo)) {
+      const koliDisBarkodNo = normalizeBarcode(row.koliDisBarkodNo);
+      const fileCodes = [barkodNo, koliDisBarkodNo].filter(Boolean);
+      if (fileCodes.some((code) => seenInFile.has(code))) {
         errors.push({
           rowIndex: row.rowIndex,
           barkodNo,
@@ -216,7 +233,7 @@ export async function importProducts(rows: ImportRow[]) {
         });
         continue;
       }
-      if (barkodNo) seenInFile.add(barkodNo);
+      fileCodes.forEach((code) => seenInFile.add(code));
 
       let numericError: string | null = null;
       for (const field of NUMERIC_FIELDS) {
@@ -228,7 +245,7 @@ export async function importProducts(rows: ImportRow[]) {
         continue;
       }
 
-      const current = barkodNo ? byBarcode.get(barkodNo) : undefined;
+      const current = (barkodNo && byBarcode.get(barkodNo)) || (koliDisBarkodNo && byBarcode.get(koliDisBarkodNo));
       if (current) {
         const merged = { ...current };
         for (const field of PRODUCT_FIELDS) {
@@ -240,11 +257,13 @@ export async function importProducts(rows: ImportRow[]) {
         }
         merged.guncellemeTarihi = nowStamp();
         toUpdate.push(merged);
-        byBarcode.set(barkodNo, merged);
+        if (merged.barkodNo) byBarcode.set(merged.barkodNo, merged);
+        if (merged.koliDisBarkodNo) byBarcode.set(merged.koliDisBarkodNo, merged);
       } else {
         const stamp = nowStamp();
         const created = {
           barkodNo,
+          koliDisBarkodNo,
           urunAdi: String(row.urunAdi ?? "").trim(),
           anaKategori: String(row.anaKategori ?? "").trim(),
           altKategori: String(row.altKategori ?? "").trim(),
@@ -268,6 +287,7 @@ export async function importProducts(rows: ImportRow[]) {
         } as ProductRecord;
         toCreate.push(created);
         if (barkodNo) byBarcode.set(barkodNo, created);
+        if (koliDisBarkodNo) byBarcode.set(koliDisBarkodNo, created);
       }
     }
 

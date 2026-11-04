@@ -59,7 +59,7 @@ npm test
 npm run build
 ```
 
-Backend testleri Render'ın kullanacağı `/health` uç noktasını, oturum korumasını ve oturum durumunu Google Sheets'e bağlanmadan denetler. Google bağlantısını deploy sonrası ayrıca `https://<render-servis-adı>.onrender.com/api/health` adresinden doğrulayın; `sheets: true` başarılı erişim anlamına gelir. Bu kontrol tablo verilerini değiştirmez.
+Backend testleri Render'ın kullanacağı `/health` uç noktasını ve giriş ekranı olmadan API erişimini Google Sheets'e bağlanmadan denetler. Google bağlantısını deploy sonrası ayrıca `https://<render-servis-adı>.onrender.com/api/health` adresinden doğrulayın; `sheets: true` başarılı erişim anlamına gelir. Bu kontrol tablo verilerini değiştirmez.
 
 ## Render ile tek serviste canlıya alma
 
@@ -85,7 +85,6 @@ Bu kurulum frontend'i ve API'yi aynı Render Web Service'te sunar. Böylece hari
    | --- | --- |
    | `NODE_ENV` | `production` |
    | `VITE_API_URL` | `/api` (Blueprint tarafından ayarlanır; frontend ve API aynı origin'de) |
-   | `APP_PASSWORD` | Uygulamada kullanılacak giriş parolası |
    | `GOOGLE_SPREADSHEET_ID` | Google Sheet kimliği |
    | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Servis hesabı JSON dosyasındaki `client_email` |
    | `GOOGLE_PRIVATE_KEY` | Aynı JSON'daki `private_key` değerinin tamamı; `\\n` satır sonları korunmalı |
@@ -98,7 +97,7 @@ Bu kurulum frontend'i ve API'yi aynı Render Web Service'te sunar. Böylece hari
 
 1. `https://<render-servis-adı>.onrender.com/health` → `{"success":true,"data":{"api":true}}` beklenir.
 2. Aynı hosttaki `/api/health` → `data.sheets: true` döndürmeli; bu kontrol Google Sheets'e salt okunur istek yapar.
-3. Render adresinde oturum açıp ürün arama ve kamera izinlerini kontrol edin. Gerçek ürün kaydı Google Sheet'i değiştirir; kayıt kontrolünde geçici bir ürün kullanın.
+3. Render adresinde ürün arama ve kamera izinlerini kontrol edin. Gerçek ürün kaydı Google Sheet'i değiştirir; kayıt kontrolünde geçici bir ürün kullanın.
 
 ## Uygulama kullanımı
 
@@ -111,5 +110,5 @@ Bu kurulum frontend'i ve API'yi aynı Render Web Service'te sunar. Böylece hari
 
 - `.env`, `.env.*` (örnek dosyalar dışında), `google-credentials.json` ve servis hesabı anahtarı Git dışında tutulur.
 - Google kimlik bilgileri yalnızca Render backend ortamında saklanır.
-- Uygulama tek ortak parola ile oturum açar; ayrı kullanıcı/rol yönetimi yoktur.
+- Uygulamaya giriş parolası yoktur; Render URL'sine erişen kişiler uygulamayı kullanabilir. Şirket içi kullanım için URL'yi yalnızca çalışanlarla paylaşın.
 - Canlıya almadan önce `git status` ve `git ls-files` ile anahtar veya `.env` dosyalarının repoya eklenmediğini kontrol edin. Daha önce GitHub'a anahtar yüklendiyse dosyayı silmek yeterli değildir; servis hesabı anahtarını Google Cloud Console'dan iptal edip yenisini oluşturun.

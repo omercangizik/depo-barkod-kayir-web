@@ -153,7 +153,9 @@ export function applyMapping(rows: string[][], mapping: ColumnMapping, rowNumber
       const value = row[col] ?? "";
       // A mapped empty cell is intentional: imports mirror the file and can
       // clear an existing value. Unmapped columns remain untouched.
-      mapped[field] = field === "barkodNo" ? normalizeBarcode(value) : String(value).trim();
+      mapped[field] = field === "barkodNo" || field === "koliDisBarkodNo"
+        ? normalizeBarcode(value)
+        : String(value).trim();
     }
     return mapped;
   });
@@ -171,14 +173,15 @@ export async function buildExportWorkbook(products: ProductRecord[]): Promise<Bu
   sheet.getRow(1).font = { bold: true };
   for (const product of products) {
     const values = PRODUCT_FIELDS.map((field) => {
-      if (field === "barkodNo") return String(product.barkodNo ?? "");
+      if (field === "barkodNo" || field === "koliDisBarkodNo") return String(product[field] ?? "");
       return product[field] ?? "";
     });
     const row = sheet.addRow(values);
-    row.getCell(1).numFmt = "@";
+    row.getCell(PRODUCT_FIELDS.indexOf("barkodNo") + 1).numFmt = "@";
+    row.getCell(PRODUCT_FIELDS.indexOf("koliDisBarkodNo") + 1).numFmt = "@";
   }
-  const col = sheet.getColumn(1);
-  col.numFmt = "@";
+  sheet.getColumn(PRODUCT_FIELDS.indexOf("barkodNo") + 1).numFmt = "@";
+  sheet.getColumn(PRODUCT_FIELDS.indexOf("koliDisBarkodNo") + 1).numFmt = "@";
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
 }

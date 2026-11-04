@@ -61,7 +61,8 @@ export function ScanPage() {
   const [zoomRange, setZoomRange] = useState<CameraZoomRange | null>(null);
   const [zoomValue, setZoomValue] = useState(1);
   const [manual, setManual] = useState("");
-  const [matches, setMatches] = useState<{ barkodNo: string; urunAdi: string; anaKategori: string }[]>([]);
+  const [barcodeTarget, setBarcodeTarget] = useState<"barkodNo" | "koliDisBarkodNo">("barkodNo");
+  const [matches, setMatches] = useState<{ barkodNo: string; koliDisBarkodNo: string; urunAdi: string; anaKategori: string }[]>([]);
   const [searching, setSearching] = useState(false);
   const [status, setStatus] = useState("Kamera bağlanıyor...");
   const [error, setError] = useState("");
@@ -82,7 +83,8 @@ export function ScanPage() {
       } catch (err) {
         const message = getErrorMessage(err);
         if (message.toLocaleLowerCase("tr-TR").includes("bulunamadı")) {
-          navigate(`/products/new?barcode=${encodeURIComponent(code)}`);
+          const params = new URLSearchParams({ barcode: code, barcodeField: barcodeTarget });
+          navigate(`/products/new?${params.toString()}`);
         } else {
           setError(message);
           setStatus("Barkod okundu ancak ürün aranamadı. Bağlantıyı kontrol edip tekrar deneyin.");
@@ -91,7 +93,7 @@ export function ScanPage() {
         }
       }
     },
-    [navigate],
+    [barcodeTarget, navigate],
   );
 
   useEffect(() => {
@@ -233,7 +235,9 @@ export function ScanPage() {
       const response = await apiClient.products({ search: query, page: 1, limit: 100 });
       const items = response.data.data.items;
       const normalizedQuery = query.toLocaleLowerCase("tr-TR").replace(/\s+/g, " ");
-      const exactBarcode = items.find((item) => item.barkodNo.trim() === query);
+      const exactBarcode = items.find(
+        (item) => item.barkodNo.trim() === query || item.koliDisBarkodNo.trim() === query,
+      );
       const exactName = items.filter(
         (item) => item.urunAdi.trim().toLocaleLowerCase("tr-TR").replace(/\s+/g, " ") === normalizedQuery,
       );
@@ -252,7 +256,8 @@ export function ScanPage() {
         return;
       }
       if (/^\d+$/.test(query)) {
-        navigate(`/products/new?barcode=${encodeURIComponent(query)}`);
+        const params = new URLSearchParams({ barcode: query, barcodeField: barcodeTarget });
+        navigate(`/products/new?${params.toString()}`);
         return;
       }
       setStatus("Bu adla eşleşen bir ürün bulunamadı.");
@@ -299,6 +304,25 @@ export function ScanPage() {
         )}
       </div>
       <p className="text-sm text-slate-600" aria-live="polite">{status}</p>
+      <fieldset className="rounded-xl bg-white p-3 shadow-sm">
+        <legend className="px-1 text-sm font-medium text-slate-700">Yeni okutulan barkod hangi alana yazılsın?</legend>
+        <div className="grid grid-cols-2 gap-2">
+          {([
+            ["barkodNo", "Ürün / iç barkod"],
+            ["koliDisBarkodNo", "Koli dış barkodu"],
+          ] as const).map(([field, label]) => (
+            <button
+              key={field}
+              type="button"
+              aria-pressed={barcodeTarget === field}
+              onClick={() => setBarcodeTarget(field)}
+              className={`rounded-lg border px-3 py-2 text-sm ${barcodeTarget === field ? "border-navy bg-navy text-white" : "border-slate-300 bg-white text-slate-700"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </fieldset>
       <div className="flex flex-col gap-2 sm:flex-row">
         <select
           aria-label="Kamera seç"
@@ -365,7 +389,7 @@ export function ScanPage() {
                   className="w-full p-3 text-left hover:bg-slate-50"
                 >
                   <span className="block font-medium">{product.urunAdi || "Adsız ürün"}</span>
-                  <span className="mt-1 block text-sm text-slate-500">{product.barkodNo} · {product.anaKategori || "Kategori yok"}</span>
+                  <span className="mt-1 block text-sm text-slate-500">{product.barkodNo}{product.koliDisBarkodNo ? ` · Koli: ${product.koliDisBarkodNo}` : ""} · {product.anaKategori || "Kategori yok"}</span>
                 </button>
               </li>
             ))}

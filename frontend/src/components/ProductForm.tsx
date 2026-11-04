@@ -15,6 +15,7 @@ import { Alert } from "./Alert";
 
 const schema = z.object({
   barkodNo: z.string().trim().min(1, "Barkod No zorunludur"),
+  koliDisBarkodNo: z.string().optional().default(""),
   urunAdi: z.string().trim().min(1, "Ürün adı zorunludur"),
   anaKategori: z.string().trim().min(1, "Ana kategori zorunludur"),
   altKategori: z.string().optional().default(""),
@@ -50,12 +51,13 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-const BASIC: ProductField[] = ["barkodNo", "urunAdi", "anaKategori", "altKategori", "marka", "urunKodu"];
+const BASIC: ProductField[] = ["barkodNo", "koliDisBarkodNo", "urunAdi", "anaKategori", "altKategori", "marka", "urunKodu"];
 const FEATURES: ProductField[] = ["malzeme", "olcu", "hacim", "renk", "paketIciAdet", "koliIciPaket", "birim", "aciklama"];
 const STOCK: ProductField[] = ["mevcutStok", "minimumStok", "rafKonum", "alisFiyati", "satisFiyati"];
 const REQUIRED: ProductField[] = ["barkodNo", "urunAdi", "anaKategori"];
 const FIELD_HELP: Record<ProductField, string> = {
-  barkodNo: "Barkodu okutun veya numarayı yazın.",
+  barkodNo: "Tek ürünün barkodudur. Zorunludur; barkod okutunca buraya gelir.",
+  koliDisBarkodNo: "Dış kolinin farklı barkodu varsa girin. İsteğe bağlıdır.",
   urunAdi: "Marka ve özellikleriyle yazın. Örn: 500 CC Sızdırmaz Kap",
   anaKategori: "Ürünün ait olduğu ana grubu seçin.",
   altKategori: "Ürünün daha özel grubunu yazın veya seçin.",
@@ -143,7 +145,16 @@ export function ProductForm({ mode, initial, onSaved }: Props) {
       const errorText = getErrorMessage(err);
       if (formMode === "create" && errorText.toLocaleLowerCase("tr-TR").includes("zaten var")) {
         try {
-          const existing = await apiClient.getByBarcode(values.barkodNo.trim());
+          let existing;
+          for (const code of [values.barkodNo.trim(), values.koliDisBarkodNo.trim()].filter(Boolean)) {
+            try {
+              existing = await apiClient.getByBarcode(code);
+              break;
+            } catch {
+              // The duplicate may be the other barcode field.
+            }
+          }
+          if (!existing) throw new Error("Mevcut ürün bulunamadı");
           const product = existing.data.data;
           setActiveProduct(product);
           setFormMode("edit");
@@ -217,7 +228,8 @@ export function ProductForm({ mode, initial, onSaved }: Props) {
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
       {message && <Alert type={message.type}>{message.text}</Alert>}
       <section className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
-        <h2 className="font-semibold text-navy">Temel bilgiler</h2>
+        <h2 className="font-semibold text-navy">Barkod ve temel bilgiler</h2>
+        <p className="text-xs text-slate-500">Ürün/iç barkod ve koli dış barkodu ayrı alanlarda tutulur. Koli barkodu yoksa boş bırakabilirsiniz.</p>
         <div className="grid gap-3 sm:grid-cols-2">{BASIC.map(renderField)}</div>
         <datalist id="alt-kategori-list">
           {matchingSubs.map((s) => (

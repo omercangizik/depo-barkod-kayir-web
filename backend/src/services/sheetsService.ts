@@ -395,7 +395,9 @@ function mapRow(row: unknown[], rowNumber: number): ProductRecord {
   product.rowNumber = rowNumber;
   PRODUCT_FIELDS.forEach((field, index) => {
     const raw = row[productColumnIndexes[index]];
-    product[field] = field === "barkodNo" ? normalizeBarcode(raw) : String(raw ?? "").trim();
+    product[field] = field === "barkodNo" || field === "koliDisBarkodNo"
+      ? normalizeBarcode(raw)
+      : String(raw ?? "").trim();
   });
   return product;
 }

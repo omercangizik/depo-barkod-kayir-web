@@ -3,10 +3,6 @@ import { env, hasGoogleCredentials } from "./config/env.js";
 import { ensureStructure } from "./services/sheetsService.js";
 
 const app = createApp();
-
-if (env.nodeEnv === "production" && env.appPassword.length < 4) {
-  throw new Error("Canlı ortamda APP_PASSWORD en az 4 karakter olmalıdır.");
-}
 app.listen(env.port, env.host, async () => {
   console.log(`Backend ${env.host}:${env.port}`);
   if (!hasGoogleCredentials()) {

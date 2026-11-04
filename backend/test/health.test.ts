@@ -36,14 +36,13 @@ describe("HTTP readiness and API access", () => {
     });
   });
 
-  it("keeps product API routes behind the server-side session", async () => {
+  it("does not require a login session for product routes", async () => {
     const response = await fetch(`${baseUrl}/api/products/stats`);
-    assert.equal(response.status, 401);
+    assert.notEqual(response.status, 401);
   });
 
-  it("reports no login session without requiring Sheets", async () => {
+  it("does not expose obsolete login endpoints", async () => {
     const response = await fetch(`${baseUrl}/api/auth/session`);
-    assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { success: true, data: { authenticated: false } });
+    assert.equal(response.status, 404);
   });
 });

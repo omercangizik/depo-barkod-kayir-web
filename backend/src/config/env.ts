@@ -17,7 +17,6 @@ export const env = {
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),
-  appPassword: process.env.APP_PASSWORD ?? (process.env.NODE_ENV === "production" ? "" : "3456"),
   spreadsheetId:
     process.env.GOOGLE_SPREADSHEET_ID ??
     "10KCbcRYIWy3uKwlYiViCww8EqEyCUg70W5yVca3AkBU",
