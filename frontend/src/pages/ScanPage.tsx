@@ -149,7 +149,7 @@ export function ScanPage() {
         controls = startedControls;
         controlsRef.current = startedControls;
         setCameraReady(true);
-        setStatus("Barkodu çerçeveye alın. Uzaktaysa yakınlaştırmayı artırıp telefonu sabit tutun.");
+        setStatus("Barkodun tamamı görüntü içinde kaldığı sürece özel bir çerçeveye hizalamanız gerekmez. Uzaktaysa yakınlaştırmayı artırın.");
         const videoTrack = video.srcObject instanceof MediaStream
           ? video.srcObject.getVideoTracks()[0]
           : undefined;
@@ -287,7 +287,7 @@ export function ScanPage() {
       <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-black sm:aspect-video">
         <video
           ref={videoRef}
-          className={`${cameraOn ? "block" : "hidden"} h-full w-full object-cover`}
+          className={`${cameraOn ? "block" : "hidden"} h-full w-full object-contain`}
           muted
           playsInline
           autoPlay
@@ -297,7 +297,6 @@ export function ScanPage() {
             {cameraOn ? "Kamera görüntüsü bekleniyor..." : "Kamera kapalı. Manuel barkod girişini kullanabilirsiniz."}
           </div>
         )}
-        {cameraReady && <div className="pointer-events-none absolute inset-x-6 top-1/2 h-28 -translate-y-1/2 rounded-xl border-2 border-white/90 shadow-[0_0_0_999px_rgba(0,0,0,0.18)]" />}
       </div>
       <p className="text-sm text-slate-600" aria-live="polite">{status}</p>
       <div className="flex flex-col gap-2 sm:flex-row">
