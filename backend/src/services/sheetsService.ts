@@ -129,7 +129,7 @@ async function resolveProductsSheet(client: sheets_v4.Sheets, metas: SheetMeta[]
   productsSheetTitle = PRODUCTS_SHEET_TITLE;
   await client.spreadsheets.values.update({
     spreadsheetId: env.spreadsheetId,
-    range: `'${productsSheetTitle}'!A1:T1`,
+    range: `'${productsSheetTitle}'!A1:${columnLetter(PRODUCT_HEADERS.length)}1`,
     valueInputOption: "RAW",
     requestBody: { values: [ [...PRODUCT_HEADERS] ] },
   });
@@ -217,9 +217,22 @@ async function ensureProductHeaders(client: sheets_v4.Sheets) {
   const values = await readRange(client, `'${productsSheetTitle}'!A1:${lastColumn}`);
   const headerRow = values[0] ?? [];
   if (!headerRow.length || headerRow.every((c) => !String(c ?? "").trim())) {
+    if (productSheet.columnCount < PRODUCT_HEADERS.length) {
+      await client.spreadsheets.batchUpdate({
+        spreadsheetId: env.spreadsheetId,
+        requestBody: {
+          requests: [{
+            updateSheetProperties: {
+              properties: { sheetId: productSheet.sheetId, gridProperties: { columnCount: PRODUCT_HEADERS.length } },
+              fields: "gridProperties.columnCount",
+            },
+          }],
+        },
+      });
+    }
     await client.spreadsheets.values.update({
       spreadsheetId: env.spreadsheetId,
-      range: `'${productsSheetTitle}'!A1:T1`,
+      range: `'${productsSheetTitle}'!A1:${columnLetter(PRODUCT_HEADERS.length)}1`,
       valueInputOption: "RAW",
       requestBody: { values: [[...PRODUCT_HEADERS]] },
     });
@@ -339,7 +352,9 @@ async function refreshProductColumnIndexes(client: sheets_v4.Sheets) {
   // A user may clear the spreadsheet while the server is still running.
   // Recreate/repair headers before selecting columns for a read or write.
   await ensureProductHeaders(client);
-  const values = await readRange(client, `'${productsSheetTitle}'!A1:AZ1`);
+  const sheet = (await listSheets(client)).find((item) => item.title === productsSheetTitle);
+  if (!sheet) throw new SheetsError(`Google Sheets içinde "${productsSheetTitle}" sekmesi bulunamadı.`);
+  const values = await readRange(client, `'${productsSheetTitle}'!A1:${columnLetter(sheet.columnCount)}1`);
   const headers = values[0] ?? [];
   const used = new Set<number>();
   const refreshed = PRODUCT_FIELDS.map((field) => {
@@ -474,7 +489,7 @@ export async function updateProductRows(products: ProductRecord[]) {
           const endMatch = previous.range.match(/!([A-Z]+)\d+:([A-Z]+)\d+$/);
           const endColumn = endMatch?.[2];
           const nextColumn = columnLetter(cell.column + 1);
-          if (endColumn && columnLetter(columnIndex(endColumn) + 2) === nextColumn) {
+          if (endColumn && columnLetter(columnIndex(endColumn) + 1) === nextColumn) {
             previous.range = previous.range.replace(/:[A-Z]+(\d+)$/, `:${nextColumn}$1`);
             previous.values[0].push(cell.value);
             continue;

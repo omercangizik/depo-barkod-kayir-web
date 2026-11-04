@@ -41,7 +41,10 @@ function mergeProduct(
     const raw = updates[field];
     if (raw === null) continue;
     const value = String(raw ?? "").trim();
-    if (isBlank(value)) continue;
+    if (isBlank(value)) {
+      next[field] = "";
+      continue;
+    }
     next[field] = NUMERIC_FIELDS.includes(field as (typeof NUMERIC_FIELDS)[number])
       ? sanitizeNumeric(value)
       : value;

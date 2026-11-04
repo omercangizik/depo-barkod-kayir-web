@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import type { AddressInfo } from "node:net";
 import { createApp } from "../src/app.js";
+import { PRODUCT_FIELDS, PRODUCT_HEADERS } from "../src/config/constants.js";
+import { emptyProduct } from "../src/types/product.js";
+import { productToRow } from "../src/services/sheetsService.js";
 
 describe("HTTP readiness and API access", () => {
   let server: ReturnType<ReturnType<typeof createApp>["listen"]>;
@@ -44,5 +47,27 @@ describe("HTTP readiness and API access", () => {
   it("does not expose obsolete login endpoints", async () => {
     const response = await fetch(`${baseUrl}/api/auth/session`);
     assert.equal(response.status, 404);
+  });
+});
+
+describe("Google Sheets product column mapping", () => {
+  it("keeps every saved product value in the matching header order", () => {
+    assert.equal(PRODUCT_HEADERS.length, PRODUCT_FIELDS.length);
+    const product = emptyProduct();
+    PRODUCT_FIELDS.forEach((field, index) => {
+      product[field] = `alan-${index + 1}`;
+    });
+    assert.deepEqual(productToRow(product), PRODUCT_FIELDS.map((_, index) => `alan-${index + 1}`));
+  });
+
+  it("writes cleared values as empty cells instead of shifting later values", () => {
+    const product = emptyProduct();
+    product.barkodNo = "8691234567890";
+    product.koliDisBarkodNo = "";
+    product.urunAdi = "Sızdırmaz Kap";
+    const row = productToRow(product);
+    assert.equal(row[PRODUCT_FIELDS.indexOf("barkodNo")], "8691234567890");
+    assert.equal(row[PRODUCT_FIELDS.indexOf("koliDisBarkodNo")], "");
+    assert.equal(row[PRODUCT_FIELDS.indexOf("urunAdi")], "Sızdırmaz Kap");
   });
 });

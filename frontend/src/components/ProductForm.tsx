@@ -132,7 +132,7 @@ export function ProductForm({ mode, initial, onSaved }: Props) {
         if (field === "barkodNo" || field === "kayitTarihi" || field === "guncellemeTarihi") return;
         const next = (values[field] ?? "").trim();
         const prev = (original[field] ?? "").trim();
-        if (next && next !== prev) updates[field] = next;
+        if (next !== prev) updates[field] = next;
       });
       if (Object.keys(updates).length === 0) {
         setMessage({ type: "success", text: "Kaydedilecek bir değişiklik yok." });
