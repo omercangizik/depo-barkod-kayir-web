@@ -8,7 +8,6 @@ export function DashboardPage() {
   const [stats, setStats] = useState<ProductStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [error, setError] = useState("");
-  const [exporting, setExporting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,18 +17,6 @@ export function DashboardPage() {
       .catch((err) => setError(getErrorMessage(err)))
       .finally(() => setLoadingStats(false));
   }, []);
-
-  async function exportExcel() {
-    setExporting(true);
-    setError("");
-    try {
-      await apiClient.exportFile();
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setExporting(false);
-    }
-  }
 
   return (
     <div className="space-y-5">
@@ -64,14 +51,6 @@ export function DashboardPage() {
         <div className="grid grid-cols-2 gap-2 sm:gap-3">
           <Action to="/products/new" label="Manuel Ürün Ekle" />
           <Action to="/products" label="Ürün Listesi" />
-          <Action to="/import" label="Excel'den Aktar" />
-          <button
-            onClick={exportExcel}
-            disabled={exporting}
-            className="rounded-2xl bg-white border border-slate-200 py-4 font-medium text-slate-800 disabled:opacity-60"
-          >
-            {exporting ? "İndiriliyor..." : "Excel'e Aktar"}
-          </button>
         </div>
       </div>
       <section className="bg-white rounded-2xl p-4 shadow-sm">

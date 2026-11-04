@@ -1,16 +1,16 @@
-import { type FormEvent, type ReactNode, useState } from "react";
-
-const MENU_PASSWORD = "456";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { isAdminMenuUnlocked, onAdminMenuAccessChange, unlockAdminMenu } from "../services/adminAccess";
 
 export function MenuPasswordGate({ children, title }: { children: ReactNode; title: string }) {
-  const [unlocked, setUnlocked] = useState(false);
+  const [unlocked, setUnlocked] = useState(isAdminMenuUnlocked);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
+  useEffect(() => onAdminMenuAccessChange(() => setUnlocked(isAdminMenuUnlocked())), []);
+
   function unlock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (password === MENU_PASSWORD) {
-      setUnlocked(true);
+    if (unlockAdminMenu(password)) {
       setError("");
     } else {
       setError("Şifre yanlış. Tekrar deneyin.");
