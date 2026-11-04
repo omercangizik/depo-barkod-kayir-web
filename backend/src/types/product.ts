@@ -15,6 +15,7 @@ export const productSchema = z.object({
   altKategori: optionalText,
   marka: optionalText,
   urunKodu: optionalText,
+  stokKodu: optionalText,
   malzeme: optionalText,
   olcu: optionalText,
   hacim: optionalText,

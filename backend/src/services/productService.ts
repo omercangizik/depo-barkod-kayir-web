@@ -116,6 +116,16 @@ export async function getStats() {
   };
 }
 
+export async function getProductOptions() {
+  const all = await readAllProducts();
+  const fields = ["marka", "malzeme", "renk", "birim", "rafKonum"] as const;
+  return Object.fromEntries(fields.map((field) => [
+    field,
+    [...new Set(all.map((product) => product[field].trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, "tr-TR")),
+  ])) as Record<(typeof fields)[number], string[]>;
+}
+
 export async function findByBarcode(barcode: string) {
   const code = normalizeBarcode(barcode);
   const all = await readAllProducts();
@@ -277,6 +287,7 @@ export async function importProducts(rows: ImportRow[]) {
           altKategori: String(row.altKategori ?? "").trim(),
           marka: String(row.marka ?? "").trim(),
           urunKodu: String(row.urunKodu ?? "").trim(),
+          stokKodu: String(row.stokKodu ?? "").trim(),
           malzeme: String(row.malzeme ?? "").trim(),
           olcu: String(row.olcu ?? "").trim(),
           hacim: String(row.hacim ?? "").trim(),

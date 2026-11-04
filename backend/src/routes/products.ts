@@ -6,6 +6,7 @@ import {
   getByBarcode,
   importFile,
   list,
+  options,
   previewImport,
   stats,
   update,
@@ -32,6 +33,7 @@ export const productsRouter = Router();
 
 productsRouter.get("/", asyncHandler(list));
 productsRouter.get("/stats", asyncHandler(stats));
+productsRouter.get("/options", asyncHandler(options));
 productsRouter.get("/export", asyncHandler(exportFile));
 productsRouter.post("/import/preview", upload.single("file"), asyncHandler(previewImport));
 productsRouter.post("/import", upload.single("file"), asyncHandler(importFile));

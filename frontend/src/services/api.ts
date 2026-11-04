@@ -30,6 +30,7 @@ export function getErrorMessage(err: unknown): string {
 export const apiClient = {
   health: () => api.get("/health"),
   stats: () => api.get<{ success: boolean; data: ProductStats }>("/products/stats"),
+  productOptions: () => api.get<{ success: boolean; data: Record<"marka" | "malzeme" | "renk" | "birim" | "rafKonum", string[]> }>("/products/options"),
   products: (params: Record<string, string | number | boolean>) =>
     api.get<{ success: boolean; data: PaginatedProducts }>("/products", { params }),
   getByBarcode: (barcode: string) =>

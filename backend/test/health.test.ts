@@ -76,4 +76,14 @@ describe("Google Sheets product column mapping", () => {
     assert.equal(headerToField("Koli Dış Barkod No"), "koliDisBarkodNo");
     assert.equal(PRODUCT_HEADERS[PRODUCT_FIELDS.indexOf("koliDisBarkodNo")], "Koli Dış Barkod No");
   });
+
+  it("maps manufacturer product code and stock code to different sheet columns", () => {
+    const manufacturerCodeColumn = PRODUCT_FIELDS.indexOf("urunKodu");
+    const stockCodeColumn = PRODUCT_FIELDS.indexOf("stokKodu");
+    assert.notEqual(manufacturerCodeColumn, stockCodeColumn);
+    assert.equal(headerToField("Üretici Ürün Kodu"), "urunKodu");
+    assert.equal(headerToField("Stok Kodu"), "stokKodu");
+    assert.equal(PRODUCT_HEADERS[manufacturerCodeColumn], "Üretici Ürün Kodu");
+    assert.equal(PRODUCT_HEADERS[stockCodeColumn], "Stok Kodu");
+  });
 });

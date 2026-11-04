@@ -14,6 +14,7 @@ import {
 import {
   createProduct,
   findByBarcode,
+  getProductOptions,
   getStats,
   importProducts,
   listProducts,
@@ -33,6 +34,11 @@ export async function list(req: Request, res: Response) {
 
 export async function stats(_req: Request, res: Response) {
   const data = await getStats();
+  res.json({ success: true, data });
+}
+
+export async function options(_req: Request, res: Response) {
+  const data = await getProductOptions();
   res.json({ success: true, data });
 }
 
