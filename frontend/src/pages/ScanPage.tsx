@@ -53,7 +53,9 @@ export function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
   const busyRef = useRef(false);
-  const lastCodeRef = useRef("");
+  const lastCodeRef = useRef<{ barkodNo: string; koliDisBarkodNo: string }>({ barkodNo: "", koliDisBarkodNo: "" });
+  const barcodeTargetRef = useRef<"barkodNo" | "koliDisBarkodNo">("barkodNo");
+  const audioContextRef = useRef<AudioContext | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState("");
   const [cameraOn, setCameraOn] = useState(true);
@@ -71,19 +73,38 @@ export function ScanPage() {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  const handleCode = useCallback(
-    (raw: string) => {
-      const code = raw.trim();
-      if (!code || code === lastCodeRef.current) return;
-      lastCodeRef.current = code;
-      setError("");
-      if (barcodeTarget === "koliDisBarkodNo") setOuterBarcode(code);
-      else setInnerBarcode(code);
-      setStatus(`${barcodeTarget === "koliDisBarkodNo" ? "Koli dış barkodu" : "Ürün/iç barkodu"} okundu: ${code}. Diğer barkodu da okutabilir veya ürün ekranına geçebilirsiniz.`);
-      if (navigator.vibrate) navigator.vibrate(80);
-    },
-    [barcodeTarget],
-  );
+  const handleCode = useCallback((raw: string) => {
+    const code = raw.trim();
+    const target = barcodeTargetRef.current;
+    if (!code || code === lastCodeRef.current[target]) return;
+    lastCodeRef.current[target] = code;
+    setError("");
+    if (target === "koliDisBarkodNo") setOuterBarcode(code);
+    else setInnerBarcode(code);
+    setStatus(`${target === "koliDisBarkodNo" ? "Koli dış barkodu" : "Ürün/iç barkodu"} okundu: ${code}. Diğer barkodu da okutabilir veya ürün ekranına geçebilirsiniz.`);
+    if (navigator.vibrate) navigator.vibrate(80);
+    try {
+      if (window.AudioContext) {
+        const context = audioContextRef.current ?? new window.AudioContext();
+        audioContextRef.current = context;
+        void context.resume().then(() => {
+          const oscillator = context.createOscillator();
+          const gain = context.createGain();
+          oscillator.type = "sine";
+          oscillator.frequency.value = 880;
+          gain.gain.setValueAtTime(0.001, context.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.18, context.currentTime + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.14);
+          oscillator.connect(gain);
+          gain.connect(context.destination);
+          oscillator.start();
+          oscillator.stop(context.currentTime + 0.15);
+        });
+      }
+    } catch {
+      // Vibration still provides feedback when browser audio is unavailable.
+    }
+  }, []);
 
   useEffect(() => {
     if (!cameraOn) {
@@ -334,7 +355,7 @@ export function ScanPage() {
               key={field}
               type="button"
               aria-pressed={barcodeTarget === field}
-              onClick={() => setBarcodeTarget(field)}
+              onClick={() => { barcodeTargetRef.current = field; setBarcodeTarget(field); }}
               className={`rounded-lg border px-3 py-2 text-sm ${barcodeTarget === field ? "border-navy bg-navy text-white" : "border-slate-300 bg-white text-slate-700"}`}
             >
               {label}
@@ -351,7 +372,7 @@ export function ScanPage() {
         <button type="button" onClick={() => void openProductForm()} disabled={openingForm} className="w-full rounded-xl bg-navy py-3 font-semibold text-white disabled:opacity-60">
           {openingForm ? "Ürün aranıyor..." : "Ürün kaydına geç"}
         </button>
-        <button type="button" onClick={() => { setInnerBarcode(""); setOuterBarcode(""); lastCodeRef.current = ""; setStatus("Barkod alanları temizlendi. Kamerayla okutabilir veya elle girebilirsiniz."); }} className="w-full rounded-xl border border-slate-300 py-2.5 text-sm font-medium text-slate-700">
+        <button type="button" onClick={() => { setInnerBarcode(""); setOuterBarcode(""); lastCodeRef.current = { barkodNo: "", koliDisBarkodNo: "" }; setStatus("Barkod alanları temizlendi. Kamerayla okutabilir veya elle girebilirsiniz."); }} className="w-full rounded-xl border border-slate-300 py-2.5 text-sm font-medium text-slate-700">
           Barkod alanlarını temizle
         </button>
       </section>
