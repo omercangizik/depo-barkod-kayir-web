@@ -82,7 +82,6 @@ export async function listProducts(query: {
     filtered = filtered.filter(
       (p) =>
         p.barkodNo.toLocaleLowerCase("tr-TR").includes(search) ||
-        p.koliDisBarkodNo.toLocaleLowerCase("tr-TR").includes(search) ||
         p.urunAdi.toLocaleLowerCase("tr-TR").includes(search),
     );
   }
@@ -120,6 +119,12 @@ export async function getStats() {
 export async function findByBarcode(barcode: string) {
   const code = normalizeBarcode(barcode);
   const all = await readAllProducts();
+  return all.find((p) => p.barkodNo === code) ?? null;
+}
+
+async function findByAnyBarcode(barcode: string) {
+  const code = normalizeBarcode(barcode);
+  const all = await readAllProducts();
   return all.find((p) => p.barkodNo === code || p.koliDisBarkodNo === code) ?? null;
 }
 
@@ -140,7 +145,7 @@ export async function createProduct(input: Record<string, unknown>) {
   }
   return withBarcodeLock(parsed.barkodNo, () =>
     withSheetLock(async () => {
-      const existing = await findByBarcode(parsed.barkodNo) ?? (parsed.koliDisBarkodNo ? await findByBarcode(parsed.koliDisBarkodNo) : null);
+      const existing = await findByAnyBarcode(parsed.barkodNo) ?? (parsed.koliDisBarkodNo ? await findByAnyBarcode(parsed.koliDisBarkodNo) : null);
       if (existing) {
         throw new ConflictError("Bu barkod ile kayıtlı bir ürün zaten var");
       }
@@ -181,7 +186,7 @@ export async function updateProduct(
       if (!existing) throw new NotFoundError("Bu barkod ile ürün bulunamadı");
       const merged = mergeProduct(existing, updates, clearFields);
       for (const value of [merged.barkodNo, merged.koliDisBarkodNo].filter(Boolean)) {
-        const collision = await findByBarcode(value);
+        const collision = await findByAnyBarcode(value);
         if (collision && collision.rowNumber !== existing.rowNumber) {
           throw new ConflictError("Bu barkod başka bir üründe kayıtlı");
         }

@@ -245,9 +245,7 @@ export function ScanPage() {
       const response = await apiClient.products({ search: query, page: 1, limit: 100 });
       const items = response.data.data.items;
       const normalizedQuery = query.toLocaleLowerCase("tr-TR").replace(/\s+/g, " ");
-      const exactBarcode = items.find(
-        (item) => item.barkodNo.trim() === query || item.koliDisBarkodNo.trim() === query,
-      );
+      const exactBarcode = items.find((item) => item.barkodNo.trim() === query);
       const exactName = items.filter(
         (item) => item.urunAdi.trim().toLocaleLowerCase("tr-TR").replace(/\s+/g, " ") === normalizedQuery,
       );
@@ -287,7 +285,7 @@ export function ScanPage() {
     const inner = innerBarcode.trim();
     const outer = outerBarcode.trim();
     try {
-      for (const code of [inner, outer].filter(Boolean)) {
+      for (const code of [inner].filter(Boolean)) {
         try {
           const response = await apiClient.getByBarcode(code);
           const params = new URLSearchParams();

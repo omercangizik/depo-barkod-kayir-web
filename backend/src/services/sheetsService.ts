@@ -67,6 +67,7 @@ export async function getSpreadsheetInfo() {
       sheets: titles,
     };
   } catch (err) {
+    if (err instanceof SheetsError) throw err;
     wrapSheetsError(err);
   }
 }
@@ -417,6 +418,32 @@ function mapRow(row: unknown[], rowNumber: number): ProductRecord {
   return product;
 }
 
+async function verifyProductRows(client: sheets_v4.Sheets, products: ProductRecord[]) {
+  if (!products.length) return;
+  const lastColumn = columnLetter(Math.max(...productColumnIndexes) + 1);
+  for (let offset = 0; offset < products.length; offset += 80) {
+    const chunk = products.slice(offset, offset + 80);
+    const ranges = chunk.map((product) =>
+      `'${productsSheetTitle}'!A${product.rowNumber}:${lastColumn}${product.rowNumber}`,
+    );
+    const response = await client.spreadsheets.values.batchGet({
+      spreadsheetId: env.spreadsheetId,
+      ranges,
+      valueRenderOption: "UNFORMATTED_VALUE",
+    });
+    chunk.forEach((expected, index) => {
+      const actual = mapRow(response.data.valueRanges?.[index]?.values?.[0] ?? [], expected.rowNumber);
+      for (const [fieldIndex, field] of PRODUCT_FIELDS.entries()) {
+        if (String(actual[field] ?? "") !== String(expected[field] ?? "")) {
+          throw new SheetsError(
+            `Google Sheets kaydı doğrulanamadı: "${PRODUCT_HEADERS[fieldIndex]}" alanı yazılan değerle eşleşmiyor.`,
+          );
+        }
+      }
+    });
+  }
+}
+
 export async function readAllProducts(force = false): Promise<ProductRecord[]> {
   await ensureStructure();
   if (!force && cachedProducts && Date.now() - cachedProducts.loadedAt < CACHE_MS) {
@@ -437,6 +464,7 @@ export async function readAllProducts(force = false): Promise<ProductRecord[]> {
     cachedProducts = { rows, loadedAt: Date.now() };
     return rows;
   } catch (err) {
+    if (err instanceof SheetsError) throw err;
     wrapSheetsError(err);
   }
 }
@@ -457,16 +485,28 @@ export async function appendProducts(products: ProductRecord[]) {
     await refreshProductColumnIndexes(client);
     const chunkSize = 500;
     for (let i = 0; i < products.length; i += chunkSize) {
-      await client.spreadsheets.values.append({
+      const chunk = products.slice(i, i + chunkSize);
+      const response = await client.spreadsheets.values.append({
         spreadsheetId: env.spreadsheetId,
         range: `'${productsSheetTitle}'!A:${columnLetter(Math.max(...productColumnIndexes) + 1)}`,
         valueInputOption: "RAW",
         insertDataOption: "INSERT_ROWS",
-        requestBody: { values: products.slice(i, i + chunkSize).map(productToRow) },
+        requestBody: { values: chunk.map(productToRow) },
       });
+      const updatedRange = response.data.updates?.updatedRange ?? "";
+      const rowRange = updatedRange.match(/![A-Z]+(\d+):[A-Z]+(\d+)$/);
+      if (!rowRange) throw new SheetsError("Google Sheets kaydı yazıldı ancak kayıt satırı doğrulanamadı.");
+      const firstRow = Number(rowRange[1]);
+      const lastRow = Number(rowRange[2]);
+      if (lastRow - firstRow + 1 !== chunk.length) {
+        throw new SheetsError("Google Sheets kaydı yazıldı ancak eklenen satır sayısı doğrulanamadı.");
+      }
+      chunk.forEach((product, index) => { product.rowNumber = firstRow + index; });
+      await verifyProductRows(client, chunk);
     }
     invalidateProductCache();
   } catch (err) {
+    if (err instanceof SheetsError) throw err;
     wrapSheetsError(err);
   }
 }
@@ -513,8 +553,10 @@ export async function updateProductRows(products: ProductRecord[]) {
         },
       });
     }
+    await verifyProductRows(client, products);
     invalidateProductCache();
   } catch (err) {
+    if (err instanceof SheetsError) throw err;
     wrapSheetsError(err);
   }
 }

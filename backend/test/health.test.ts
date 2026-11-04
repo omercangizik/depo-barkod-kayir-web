@@ -5,6 +5,7 @@ import { createApp } from "../src/app.js";
 import { PRODUCT_FIELDS, PRODUCT_HEADERS } from "../src/config/constants.js";
 import { emptyProduct } from "../src/types/product.js";
 import { productToRow } from "../src/services/sheetsService.js";
+import { headerToField } from "../src/utils/text.js";
 
 describe("HTTP readiness and API access", () => {
   let server: ReturnType<ReturnType<typeof createApp>["listen"]>;
@@ -69,5 +70,10 @@ describe("Google Sheets product column mapping", () => {
     assert.equal(row[PRODUCT_FIELDS.indexOf("barkodNo")], "8691234567890");
     assert.equal(row[PRODUCT_FIELDS.indexOf("koliDisBarkodNo")], "");
     assert.equal(row[PRODUCT_FIELDS.indexOf("urunAdi")], "Sızdırmaz Kap");
+  });
+
+  it("recognizes the canonical Turkish header for the carton barcode", () => {
+    assert.equal(headerToField("Koli Dış Barkod No"), "koliDisBarkodNo");
+    assert.equal(PRODUCT_HEADERS[PRODUCT_FIELDS.indexOf("koliDisBarkodNo")], "Koli Dış Barkod No");
   });
 });
