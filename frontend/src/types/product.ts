@@ -94,6 +94,7 @@ export type ProductStats = {
   total: number;
   incomplete: number;
   addedToday: number;
+  updatedToday: number;
   recent: Product[];
 };
 

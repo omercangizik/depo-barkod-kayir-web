@@ -1,5 +1,5 @@
 export const PRODUCT_HEADERS = [
-  "Barkod No",
+  "Ürün / İç Barkod No",
   "Koli Dış Barkod No",
   "Ürün Adı",
   "Ana Kategori",
@@ -116,6 +116,8 @@ export const FIELD_ALIASES: Record<string, ProductField> = {
   ean: "barkodNo",
   "ürün barkodu": "barkodNo",
   "urun barkodu": "barkodNo",
+  "ürün / iç barkod no": "barkodNo",
+  "urun / ic barkod no": "barkodNo",
   "iç barkod": "barkodNo",
   "ic barkod": "barkodNo",
   "iç barkod no": "barkodNo",

@@ -81,7 +81,7 @@ export function ScanPage() {
     setError("");
     if (target === "koliDisBarkodNo") setOuterBarcode(code);
     else setInnerBarcode(code);
-    setStatus(`${target === "koliDisBarkodNo" ? "Koli dış barkodu" : "Ürün/iç barkodu"} okundu: ${code}. Diğer barkodu da okutabilir veya ürün ekranına geçebilirsiniz.`);
+    setStatus(`${target === "koliDisBarkodNo" ? "Koli dış barkodu" : "Ürün / iç barkod"} okundu`);
     if (navigator.vibrate) navigator.vibrate(80);
     try {
       if (window.AudioContext) {
@@ -93,7 +93,7 @@ export function ScanPage() {
           oscillator.type = "sine";
           oscillator.frequency.value = 880;
           gain.gain.setValueAtTime(0.001, context.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.18, context.currentTime + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.3, context.currentTime + 0.01);
           gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.14);
           oscillator.connect(gain);
           gain.connect(context.destination);
@@ -161,7 +161,7 @@ export function ScanPage() {
         controls = startedControls;
         controlsRef.current = startedControls;
         setCameraReady(true);
-        setStatus("Barkodun tamamı görüntü içinde kaldığı sürece özel bir çerçeveye hizalamanız gerekmez. Uzaktaysa yakınlaştırmayı artırın.");
+        setStatus("Barkodu kameraya gösterin");
         const videoTrack = video.srcObject instanceof MediaStream
           ? video.srcObject.getVideoTracks()[0]
           : undefined;
@@ -266,7 +266,7 @@ export function ScanPage() {
       if (/^\d+$/.test(query)) {
         if (barcodeTarget === "koliDisBarkodNo") setOuterBarcode(query);
         else setInnerBarcode(query);
-        setStatus(`${barcodeTarget === "koliDisBarkodNo" ? "Koli dış barkodu" : "Ürün/iç barkodu"} alana eklendi. Diğer barkodu girebilir veya ürün ekranına geçebilirsiniz.`);
+        setStatus("Barkod alanına eklendi");
         return;
       }
       setStatus("Bu adla eşleşen bir ürün bulunamadı.");
@@ -343,7 +343,7 @@ export function ScanPage() {
       </div>
       <p className="text-sm text-slate-600" aria-live="polite">{status}</p>
       <fieldset className="rounded-xl bg-white p-3 shadow-sm">
-        <legend className="px-1 text-sm font-medium text-slate-700">Kamerayla okutulacak barkod türü</legend>
+        <legend className="px-1 text-sm font-medium text-slate-700">Okutulacak barkod</legend>
         <div className="grid grid-cols-2 gap-2">
           {([
             ["barkodNo", "Ürün / iç barkod"],
@@ -361,75 +361,56 @@ export function ScanPage() {
           ))}
         </div>
       </fieldset>
-      <section className="space-y-3 rounded-xl bg-white p-4 shadow-sm">
-        <p className="text-sm text-slate-600">İki barkod türünü de okutun veya elle girin. İkisinden biri yeterliyse diğerini boş bırakabilirsiniz.</p>
-        <label className="block text-sm font-medium text-slate-700" htmlFor="inner-barcode">Ürün / iç barkod</label>
-        <input id="inner-barcode" value={innerBarcode} onChange={(event) => setInnerBarcode(event.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3" placeholder="Ürün barkodunu okutun veya yazın" inputMode="numeric" autoComplete="off" />
-        <label className="block text-sm font-medium text-slate-700" htmlFor="outer-barcode">Koli dış barkodu</label>
-        <input id="outer-barcode" value={outerBarcode} onChange={(event) => setOuterBarcode(event.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3" placeholder="Koli barkodunu okutun veya yazın" inputMode="numeric" autoComplete="off" />
+      <section className="space-y-3 rounded-xl bg-white p-3 shadow-sm">
+        <div className="grid grid-cols-2 gap-2">
+          <input aria-label="Ürün / iç barkod" value={innerBarcode} onChange={(event) => setInnerBarcode(event.target.value)} className="min-w-0 rounded-lg border border-slate-300 px-3 py-3 text-sm" placeholder="Ürün / iç barkod" inputMode="numeric" autoComplete="off" />
+          <input aria-label="Koli dış barkod" value={outerBarcode} onChange={(event) => setOuterBarcode(event.target.value)} className="min-w-0 rounded-lg border border-slate-300 px-3 py-3 text-sm" placeholder="Koli dış barkod" inputMode="numeric" autoComplete="off" />
+        </div>
         <button type="button" onClick={() => void openProductForm()} disabled={openingForm} className="w-full rounded-xl bg-navy py-3 font-semibold text-white disabled:opacity-60">
-          {openingForm ? "Ürün aranıyor..." : "Ürün kaydına geç"}
+          {openingForm ? "Açılıyor..." : "Ürün kaydına geç"}
         </button>
-        <button type="button" onClick={() => { setInnerBarcode(""); setOuterBarcode(""); lastCodeRef.current = { barkodNo: "", koliDisBarkodNo: "" }; setStatus("Barkod alanları temizlendi. Kamerayla okutabilir veya elle girebilirsiniz."); }} className="w-full rounded-xl border border-slate-300 py-2.5 text-sm font-medium text-slate-700">
-          Barkod alanlarını temizle
-        </button>
+        <div className="flex justify-between gap-3">
+          <button type="button" onClick={() => { setInnerBarcode(""); setOuterBarcode(""); lastCodeRef.current = { barkodNo: "", koliDisBarkodNo: "" }; setStatus("Barkodlar temizlendi"); }} className="text-sm text-slate-600 underline underline-offset-2">Temizle</button>
+          <button type="button" onClick={() => (cameraOn ? setCameraOn(false) : retryCamera())} className="text-sm text-slate-600 underline underline-offset-2">{cameraOn ? "Kamerayı kapat" : "Kamerayı aç"}</button>
+        </div>
       </section>
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <select
-          aria-label="Kamera seç"
-          className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-3"
-          value={deviceId}
-          onChange={(event) => setDeviceId(event.target.value)}
-          disabled={!devices.length}
-        >
-          {devices.map((device, index) => (
-            <option key={device.deviceId} value={device.deviceId}>
-              {device.label || `Kamera ${index + 1}`}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={() => (cameraOn ? setCameraOn(false) : retryCamera())}
-          className="rounded-xl bg-slate-800 px-4 py-3 font-medium text-white"
-        >
-          {cameraOn ? "Kamerayı kapat" : "Kamerayı aç"}
-        </button>
-      </div>
-      {cameraReady && zoomRange && (
-        <label className="block rounded-xl bg-white p-3 text-sm text-slate-700 shadow-sm">
-          <span className="mb-2 flex items-center justify-between">
-            <span>Barkodu yakınlaştır</span>
-            <span>{zoomValue.toFixed(1)}×</span>
-          </span>
+      <details className="rounded-xl bg-white p-4 shadow-sm">
+        <summary className="cursor-pointer font-medium text-slate-700">Kamera ayarları</summary>
+        <div className="mt-3 space-y-3">
+          <select
+            aria-label="Kamera seç"
+            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3"
+            value={deviceId}
+            onChange={(event) => setDeviceId(event.target.value)}
+            disabled={!devices.length}
+          >
+            {devices.map((device, index) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Kamera ${index + 1}`}</option>)}
+          </select>
+          {cameraReady && zoomRange && (
+            <label className="block text-sm text-slate-700">
+              <span className="mb-2 flex items-center justify-between"><span>Yakınlaştırma</span><span>{zoomValue.toFixed(1)}×</span></span>
+              <input aria-label="Kamera yakınlaştırma" type="range" min={zoomRange.min} max={zoomRange.max} step={zoomRange.step || 0.1} value={zoomValue} onChange={(event) => void changeZoom(Number(event.target.value))} className="w-full accent-slate-800" />
+            </label>
+          )}
+        </div>
+      </details>
+      <details className="rounded-xl bg-white p-4 shadow-sm">
+        <summary className="cursor-pointer font-medium text-slate-700">Kayıtlı ürünü ara</summary>
+        <div className="mt-3 space-y-3">
           <input
-            aria-label="Kamera yakınlaştırma"
-            type="range"
-            min={zoomRange.min}
-            max={zoomRange.max}
-            step={zoomRange.step || 0.1}
-            value={zoomValue}
-            onChange={(event) => void changeZoom(Number(event.target.value))}
-            className="w-full accent-slate-800"
+            id="manual-barcode"
+            aria-label="Barkod veya ürün adı"
+            value={manual}
+            onChange={(event) => setManual(event.target.value)}
+            onKeyDown={(event) => event.key === "Enter" && searchManual()}
+            disabled={searching}
+            className="w-full rounded-xl border border-slate-300 px-3 py-3"
+            placeholder="Barkod veya ürün adı"
+            autoComplete="off"
           />
-        </label>
-      )}
-      <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
-        <label htmlFor="manual-barcode" className="text-sm font-medium">Barkod veya ürün adı</label>
-        <input
-          id="manual-barcode"
-          value={manual}
-          onChange={(event) => setManual(event.target.value)}
-          onKeyDown={(event) => event.key === "Enter" && searchManual()}
-          disabled={searching}
-          className="w-full rounded-xl border border-slate-300 px-3 py-3"
-          placeholder="Barkod numarası ya da ürün adı yazın"
-          inputMode="text"
-          autoComplete="off"
-        />
-        <button type="button" onClick={searchManual} disabled={searching} className="w-full rounded-xl bg-navy py-3 font-semibold text-white disabled:opacity-60">
-          {searching ? "Aranıyor..." : "Ürünü Ara"}
-        </button>
+          <button type="button" onClick={searchManual} disabled={searching} className="w-full rounded-xl border border-slate-300 py-3 font-medium text-slate-700 disabled:opacity-60">
+            {searching ? "Aranıyor..." : "Ara"}
+          </button>
         {matches.length > 0 && (
           <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200" aria-label="Arama sonuçları">
             {matches.map((product) => (
@@ -446,7 +427,8 @@ export function ScanPage() {
             ))}
           </ul>
         )}
-      </div>
+        </div>
+      </details>
     </div>
   );
 }

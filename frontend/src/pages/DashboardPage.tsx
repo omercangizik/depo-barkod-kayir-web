@@ -51,8 +51,8 @@ export function DashboardPage() {
       )}
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <Stat title="Toplam ürün" value={loadingStats ? "…" : stats?.total ?? "-"} />
-        <Stat title="Eksik bilgili" value={loadingStats ? "…" : stats?.incomplete ?? "-"} />
         <Stat title="Bugün eklenen" value={loadingStats ? "…" : stats?.addedToday ?? "-"} />
+        <Stat title="Bugün güncellenen" value={loadingStats ? "…" : stats?.updatedToday ?? "-"} />
       </div>
       <div className="grid gap-3">
         <button

@@ -112,6 +112,7 @@ export async function getStats() {
     total: all.length,
     incomplete: all.filter(isIncomplete).length,
     addedToday: all.filter((p) => isToday(p.kayitTarihi)).length,
+    updatedToday: all.filter((p) => isToday(p.guncellemeTarihi) && !isToday(p.kayitTarihi)).length,
     recent,
   };
 }

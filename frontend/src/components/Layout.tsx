@@ -91,9 +91,9 @@ export function Layout() {
       {!online && <div className="lg:ml-64 bg-red-600 text-white text-center text-sm py-2">İnternet bağlantısı yok. Kayıt işlemleri şu anda yapılamaz.</div>}
       <main id="main-content" className="mx-auto w-full max-w-6xl px-3 py-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:px-4 sm:py-5 lg:ml-64 lg:w-auto lg:pb-8"><Outlet /></main>
       <nav aria-label="Ana gezinme" className="lg:hidden fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgba(15,23,42,0.06)]">
-        <div className="mx-auto grid max-w-xl grid-cols-5">{links.map((link) => (
+        <div className="mx-auto grid max-w-xl grid-cols-6">{desktopLinks.map((link) => (
           <NavLink key={link.to} to={link.to} end={link.to === "/"} className={({ isActive }) =>
-            `flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 py-2 text-[10px] leading-tight sm:text-[11px] ${isActive ? "text-navy font-semibold" : "text-slate-500"}`
+            `flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 px-0.5 py-2 text-center text-[9px] leading-tight sm:text-[11px] ${isActive ? "text-navy font-semibold" : "text-slate-500"}`
           }><span className="text-lg leading-none">{link.icon}</span>{link.label}</NavLink>
         ))}</div>
       </nav>
