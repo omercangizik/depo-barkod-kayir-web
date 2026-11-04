@@ -19,6 +19,16 @@ const FORMATS = [
   BarcodeFormat.PDF_417,
 ];
 
+type CameraZoomRange = { min: number; max: number; step: number };
+type ExtendedCameraCapabilities = MediaTrackCapabilities & {
+  focusMode?: string[];
+  zoom?: CameraZoomRange;
+};
+type ExtendedTrackConstraint = MediaTrackConstraintSet & {
+  focusMode?: string;
+  zoom?: number;
+};
+
 function cameraErrorMessage(error: unknown): string {
   const name = error instanceof Error ? error.name : "";
   if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
@@ -48,6 +58,8 @@ export function ScanPage() {
   const [deviceId, setDeviceId] = useState("");
   const [cameraOn, setCameraOn] = useState(true);
   const [cameraReady, setCameraReady] = useState(false);
+  const [zoomRange, setZoomRange] = useState<CameraZoomRange | null>(null);
+  const [zoomValue, setZoomValue] = useState(1);
   const [manual, setManual] = useState("");
   const [matches, setMatches] = useState<{ barkodNo: string; urunAdi: string; anaKategori: string }[]>([]);
   const [searching, setSearching] = useState(false);
@@ -87,6 +99,7 @@ export function ScanPage() {
       controlsRef.current?.stop();
       controlsRef.current = null;
       setCameraReady(false);
+      setZoomRange(null);
       setStatus("Kamera kapalı. Manuel barkod girişi kullanılabilir.");
       return;
     }
@@ -103,6 +116,7 @@ export function ScanPage() {
     let controls: IScannerControls | null = null;
     setError("");
     setCameraReady(false);
+    setZoomRange(null);
     setStatus("Kamera izni bekleniyor...");
     const hints = new Map<DecodeHintType, unknown>();
     hints.set(DecodeHintType.POSSIBLE_FORMATS, FORMATS);
@@ -113,13 +127,18 @@ export function ScanPage() {
       void handleCode(result.getText());
     };
 
-    const start = deviceId
-      ? reader.decodeFromVideoDevice(deviceId, video, callback)
-      : reader.decodeFromConstraints(
-          { audio: false, video: { facingMode: { ideal: "environment" } } },
-          video,
-          callback,
-        );
+    const videoConstraints: MediaTrackConstraints = {
+      ...(deviceId
+        ? { deviceId: { exact: deviceId } }
+        : { facingMode: { ideal: "environment" } }),
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+    };
+    const start = reader.decodeFromConstraints(
+      { audio: false, video: videoConstraints },
+      video,
+      callback,
+    );
 
     start
       .then(async (startedControls) => {
@@ -130,7 +149,27 @@ export function ScanPage() {
         controls = startedControls;
         controlsRef.current = startedControls;
         setCameraReady(true);
-        setStatus("Barkodu çerçevenin içine hizalayıp sabit tutun.");
+        setStatus("Barkodu çerçeveye alın. Uzaktaysa yakınlaştırmayı artırıp telefonu sabit tutun.");
+        const videoTrack = video.srcObject instanceof MediaStream
+          ? video.srcObject.getVideoTracks()[0]
+          : undefined;
+        if (videoTrack && "getCapabilities" in videoTrack) {
+          try {
+            const capabilities = videoTrack.getCapabilities() as ExtendedCameraCapabilities;
+            const zoom = capabilities.zoom;
+            if (zoom && zoom.max > zoom.min) {
+              setZoomRange(zoom);
+              setZoomValue(videoTrack.getSettings().zoom ?? zoom.min);
+            }
+            if (capabilities.focusMode?.includes("continuous")) {
+              await videoTrack.applyConstraints({
+                advanced: [{ focusMode: "continuous" } as ExtendedTrackConstraint],
+              });
+            }
+          } catch {
+            // Kamera veya tarayıcı bu isteği desteklemese de barkod taraması devam eder.
+          }
+        }
         try {
           const cameras = (await navigator.mediaDevices.enumerateDevices()).filter(
             (item) => item.kind === "videoinput",
@@ -159,6 +198,25 @@ export function ScanPage() {
       if (controlsRef.current === controls) controlsRef.current = null;
     };
   }, [cameraOn, deviceId, handleCode]);
+
+  async function changeZoom(value: number) {
+    setZoomValue(value);
+    const videoTrack = videoRef.current?.srcObject instanceof MediaStream
+      ? videoRef.current.srcObject.getVideoTracks()[0]
+      : undefined;
+    if (!videoTrack || !zoomRange) return;
+    try {
+      const capabilities = videoTrack.getCapabilities() as ExtendedCameraCapabilities;
+      const advanced: ExtendedTrackConstraint[] = [];
+      if (capabilities.focusMode?.includes("continuous")) {
+        advanced.push({ focusMode: "continuous" });
+      }
+      advanced.push({ zoom: value });
+      await videoTrack.applyConstraints({ advanced });
+    } catch {
+      setError("Bu kamerada yakınlaştırma uygulanamadı. Telefonu barkoda biraz yaklaştırıp sabit tutun.");
+    }
+  }
 
   async function searchManual() {
     setError("");
@@ -264,6 +322,24 @@ export function ScanPage() {
           {cameraOn ? "Kamerayı kapat" : "Kamerayı aç"}
         </button>
       </div>
+      {cameraReady && zoomRange && (
+        <label className="block rounded-xl bg-white p-3 text-sm text-slate-700 shadow-sm">
+          <span className="mb-2 flex items-center justify-between">
+            <span>Barkodu yakınlaştır</span>
+            <span>{zoomValue.toFixed(1)}×</span>
+          </span>
+          <input
+            aria-label="Kamera yakınlaştırma"
+            type="range"
+            min={zoomRange.min}
+            max={zoomRange.max}
+            step={zoomRange.step || 0.1}
+            value={zoomValue}
+            onChange={(event) => void changeZoom(Number(event.target.value))}
+            className="w-full accent-slate-800"
+          />
+        </label>
+      )}
       <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
         <label htmlFor="manual-barcode" className="text-sm font-medium">Barkod veya ürün adı</label>
         <input
