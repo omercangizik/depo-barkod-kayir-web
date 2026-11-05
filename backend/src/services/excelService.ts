@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { PRODUCT_FIELDS, PRODUCT_HEADERS, type ProductField } from "../config/constants.js";
+import { PRODUCT_FORM_FIELDS, PRODUCT_HEADERS, type ProductField } from "../config/constants.js";
 import type { ProductRecord } from "../types/product.js";
 import { headerToField, normalizeBarcode } from "../utils/text.js";
 import { AppError } from "../utils/errors.js";
@@ -147,7 +147,7 @@ function matrixToTable(matrix: string[][], sourceRowNumbers: number[]) {
 export function applyMapping(rows: string[][], mapping: ColumnMapping, rowNumbers?: number[]): ImportRow[] {
   return rows.map((row, index) => {
     const mapped: ImportRow = { rowIndex: rowNumbers?.[index] ?? index + 2 };
-    for (const field of PRODUCT_FIELDS) {
+    for (const field of PRODUCT_FORM_FIELDS) {
       const col = mapping[field];
       if (col === undefined || col === null || col < 0) continue;
       const value = row[col] ?? "";
@@ -167,21 +167,21 @@ export async function buildExportWorkbook(products: ProductRecord[]): Promise<Bu
   const sheet = workbook.addWorksheet("Urunler");
   sheet.columns = PRODUCT_HEADERS.map((header, i) => ({
     header,
-    key: PRODUCT_FIELDS[i],
+    key: PRODUCT_FORM_FIELDS[i],
     width: header.length < 14 ? 16 : 28,
   }));
   sheet.getRow(1).font = { bold: true };
   for (const product of products) {
-    const values = PRODUCT_FIELDS.map((field) => {
+    const values = PRODUCT_FORM_FIELDS.map((field) => {
       if (field === "barkodNo" || field === "koliDisBarkodNo") return String(product[field] ?? "");
       return product[field] ?? "";
     });
     const row = sheet.addRow(values);
-    row.getCell(PRODUCT_FIELDS.indexOf("barkodNo") + 1).numFmt = "@";
-    row.getCell(PRODUCT_FIELDS.indexOf("koliDisBarkodNo") + 1).numFmt = "@";
+    row.getCell(PRODUCT_FORM_FIELDS.indexOf("barkodNo") + 1).numFmt = "@";
+    row.getCell(PRODUCT_FORM_FIELDS.indexOf("koliDisBarkodNo") + 1).numFmt = "@";
   }
-  sheet.getColumn(PRODUCT_FIELDS.indexOf("barkodNo") + 1).numFmt = "@";
-  sheet.getColumn(PRODUCT_FIELDS.indexOf("koliDisBarkodNo") + 1).numFmt = "@";
+  sheet.getColumn(PRODUCT_FORM_FIELDS.indexOf("barkodNo") + 1).numFmt = "@";
+  sheet.getColumn(PRODUCT_FORM_FIELDS.indexOf("koliDisBarkodNo") + 1).numFmt = "@";
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
 }

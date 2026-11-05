@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { MAX_UPLOAD_BYTES, PRODUCT_FIELDS } from "../config/constants.js";
+import { MAX_UPLOAD_BYTES, PRODUCT_FORM_FIELDS } from "../config/constants.js";
 import { productSchema, productUpdateSchema } from "../types/product.js";
 import { AppError, NotFoundError } from "../utils/errors.js";
 import { normalizeBarcode } from "../utils/text.js";
@@ -76,7 +76,7 @@ export async function previewImport(req: Request, res: Response) {
       preview: previewRows,
       totalRows: parsed.totalRows,
       headerRow: parsed.headerRow,
-      fields: PRODUCT_FIELDS,
+      fields: PRODUCT_FORM_FIELDS,
     },
   });
 }

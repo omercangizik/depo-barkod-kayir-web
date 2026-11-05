@@ -4,7 +4,11 @@ import {
   DEFAULT_CATEGORIES,
   LEGACY_CATEGORY_MAP,
   PRODUCT_FIELDS,
+  PRODUCT_FORM_FIELDS,
   PRODUCT_HEADERS,
+  PRODUCT_SHEET_FIELDS,
+  PRODUCT_SYSTEM_FIELDS,
+  PRODUCT_SYSTEM_HEADERS,
   PRODUCTS_SHEET_TITLE,
   type ProductField,
 } from "../config/constants.js";
@@ -20,7 +24,8 @@ let cachedProducts: { rows: ProductRecord[]; loadedAt: number } | null = null;
 const CACHE_MS = 2500;
 let productsSheetTitle = PRODUCTS_SHEET_TITLE;
 let categoriesSheetTitle = CATEGORIES_SHEET_TITLE;
-let productColumnIndexes: number[] = PRODUCT_FIELDS.map((_, index) => index);
+let productColumnIndexes: number[] = PRODUCT_FIELDS.map((field) => PRODUCT_SHEET_FIELDS.indexOf(field as (typeof PRODUCT_SHEET_FIELDS)[number]));
+let hiddenSystemColumnsSignature = "";
 let structureReady = false;
 let structurePromise: Promise<void> | null = null;
 
@@ -209,6 +214,33 @@ async function migrateProductCategories(client: sheets_v4.Sheets) {
   if (updates.length) invalidateProductCache();
 }
 
+function sheetHeaderForField(field: ProductField): string | undefined {
+  const formIndex = PRODUCT_FORM_FIELDS.indexOf(field as (typeof PRODUCT_FORM_FIELDS)[number]);
+  if (formIndex >= 0) return PRODUCT_HEADERS[formIndex];
+  const systemIndex = PRODUCT_SYSTEM_FIELDS.indexOf(field as (typeof PRODUCT_SYSTEM_FIELDS)[number]);
+  return systemIndex >= 0 ? PRODUCT_SYSTEM_HEADERS[systemIndex] : undefined;
+}
+
+function productSheetHeaders(): string[] {
+  return [...PRODUCT_HEADERS, ...PRODUCT_SYSTEM_HEADERS];
+}
+
+async function hideSystemColumns(client: sheets_v4.Sheets, sheetId: number, indexes: number[]) {
+  const signature = `${sheetId}:${indexes.join(",")}`;
+  if (signature === hiddenSystemColumnsSignature) return;
+  const requests = indexes.map((column) => ({
+    updateDimensionProperties: {
+      range: { sheetId, dimension: "COLUMNS" as const, startIndex: column, endIndex: column + 1 },
+      properties: { hiddenByUser: true },
+      fields: "hiddenByUser",
+    },
+  }));
+  if (requests.length) {
+    await client.spreadsheets.batchUpdate({ spreadsheetId: env.spreadsheetId, requestBody: { requests } });
+  }
+  hiddenSystemColumnsSignature = signature;
+}
+
 async function ensureProductHeaders(client: sheets_v4.Sheets) {
   const productSheet = (await listSheets(client)).find((sheet) => sheet.title === productsSheetTitle);
   if (!productSheet) {
@@ -218,13 +250,13 @@ async function ensureProductHeaders(client: sheets_v4.Sheets) {
   const values = await readRange(client, `'${productsSheetTitle}'!A1:${lastColumn}`);
   const headerRow = values[0] ?? [];
   if (!headerRow.length || headerRow.every((c) => !String(c ?? "").trim())) {
-    if (productSheet.columnCount < PRODUCT_HEADERS.length) {
+    if (productSheet.columnCount < PRODUCT_SHEET_FIELDS.length) {
       await client.spreadsheets.batchUpdate({
         spreadsheetId: env.spreadsheetId,
         requestBody: {
           requests: [{
             updateSheetProperties: {
-              properties: { sheetId: productSheet.sheetId, gridProperties: { columnCount: PRODUCT_HEADERS.length } },
+              properties: { sheetId: productSheet.sheetId, gridProperties: { columnCount: PRODUCT_SHEET_FIELDS.length } },
               fields: "gridProperties.columnCount",
             },
           }],
@@ -233,11 +265,12 @@ async function ensureProductHeaders(client: sheets_v4.Sheets) {
     }
     await client.spreadsheets.values.update({
       spreadsheetId: env.spreadsheetId,
-      range: `'${productsSheetTitle}'!A1:${columnLetter(PRODUCT_HEADERS.length)}1`,
+      range: `'${productsSheetTitle}'!A1:${columnLetter(PRODUCT_SHEET_FIELDS.length)}1`,
       valueInputOption: "RAW",
-      requestBody: { values: [[...PRODUCT_HEADERS]] },
+      requestBody: { values: [productSheetHeaders()] },
     });
-    productColumnIndexes = PRODUCT_FIELDS.map((_, index) => index);
+    productColumnIndexes = PRODUCT_FIELDS.map((field) => PRODUCT_SHEET_FIELDS.indexOf(field as (typeof PRODUCT_SHEET_FIELDS)[number]));
+    await hideSystemColumns(client, productSheet.sheetId, PRODUCT_SYSTEM_FIELDS.map((_, index) => PRODUCT_FORM_FIELDS.length + index));
     return;
   }
 
@@ -246,12 +279,15 @@ async function ensureProductHeaders(client: sheets_v4.Sheets) {
   const fieldColumns = new Map<ProductField, number[]>();
   headerRow.forEach((header, column) => {
     const field = headerToField(String(header ?? ""));
-    if (field) fieldColumns.set(field, [...(fieldColumns.get(field) ?? []), column]);
+    if (field && PRODUCT_SHEET_FIELDS.includes(field as (typeof PRODUCT_SHEET_FIELDS)[number])) {
+      fieldColumns.set(field, [...(fieldColumns.get(field) ?? []), column]);
+    }
   });
   const duplicateColumns: number[] = [];
   for (const [field, columns] of fieldColumns) {
     const primary = columns[0];
-    const canonicalHeader = PRODUCT_HEADERS[PRODUCT_FIELDS.indexOf(field)];
+    const canonicalHeader = sheetHeaderForField(field);
+    if (!canonicalHeader) continue;
     if (String(headerRow[primary] ?? "").trim() !== canonicalHeader) {
       await client.spreadsheets.values.update({
         spreadsheetId: env.spreadsheetId,
@@ -303,14 +339,34 @@ async function ensureProductHeaders(client: sheets_v4.Sheets) {
   if (!currentSheet) {
     throw new SheetsError(`Google Sheets içinde "${productsSheetTitle}" sekmesi bulunamadı.`);
   }
-  const repairedValues = await readRange(client, `'${productsSheetTitle}'!A1:${columnLetter(currentSheet.columnCount)}`);
-  const repairedHeaders = repairedValues[0] ?? [];
-  const missingFields = PRODUCT_FIELDS.flatMap((field, index) =>
-    repairedHeaders.some((header) => headerToField(String(header ?? "")) === field)
-      ? []
-      : [{ field, header: PRODUCT_HEADERS[index] }],
+  let repairedValues = await readRange(client, `'${productsSheetTitle}'!A1:${columnLetter(currentSheet.columnCount)}`);
+  let repairedHeaders = repairedValues[0] ?? [];
+  const allowedFields = new Set<ProductField>(PRODUCT_SHEET_FIELDS);
+  const extraColumns = repairedHeaders.flatMap((header, column) => {
+    const label = String(header ?? "").trim();
+    if (!label) return [];
+    const field = headerToField(label);
+    return field && allowedFields.has(field) ? [] : [column];
+  });
+  if (extraColumns.length) {
+    await client.spreadsheets.batchUpdate({
+      spreadsheetId: env.spreadsheetId,
+      requestBody: {
+        requests: extraColumns.sort((a, b) => b - a).map((column) => ({
+          deleteDimension: { range: { sheetId: currentSheet.sheetId, dimension: "COLUMNS" as const, startIndex: column, endIndex: column + 1 } },
+        })),
+      },
+    });
+    const updatedSheet = (await listSheets(client)).find((sheet) => sheet.title === productsSheetTitle);
+    if (!updatedSheet) throw new SheetsError(`Google Sheets içinde "${productsSheetTitle}" sekmesi bulunamadı.`);
+    repairedValues = await readRange(client, `'${productsSheetTitle}'!A1:${columnLetter(updatedSheet.columnCount)}`);
+    repairedHeaders = repairedValues[0] ?? [];
+  }
+
+  const missingFields = PRODUCT_SHEET_FIELDS.filter(
+    (field) => !repairedHeaders.some((header) => headerToField(String(header ?? "")) === field),
   );
-  const missing = missingFields.map(({ header }) => header);
+  const missing = missingFields.map((field) => sheetHeaderForField(field as ProductField)!);
   if (missing.length) {
     const startCol = repairedHeaders.length + 1;
     const requiredColumns = startCol + missing.length - 1;
@@ -338,15 +394,22 @@ async function ensureProductHeaders(client: sheets_v4.Sheets) {
     });
     const endColumn = columnLetter(startCol + missing.length - 1);
     const repaired = (await readRange(client, `'${productsSheetTitle}'!A1:${endColumn}1`))[0] ?? [];
-    const unresolved = PRODUCT_FIELDS.filter(
+    const unresolved = PRODUCT_SHEET_FIELDS.filter(
       (field) => !repaired.some((header) => headerToField(String(header ?? "")) === field),
     );
     if (unresolved.length) {
       throw new SheetsError(
-        `Ürün başlıkları oluşturulamadı: ${unresolved.map((field) => PRODUCT_HEADERS[PRODUCT_FIELDS.indexOf(field)]).join(", ")}.`,
+        `Ürün başlıkları oluşturulamadı: ${unresolved.map((field) => sheetHeaderForField(field as ProductField)).join(", ")}.`,
       );
     }
   }
+  const finalSheet = (await listSheets(client)).find((sheet) => sheet.title === productsSheetTitle);
+  const finalHeaders = (await readRange(client, `'${productsSheetTitle}'!A1:${columnLetter(finalSheet?.columnCount ?? currentSheet.columnCount)}1`))[0] ?? [];
+  const hiddenIndexes = PRODUCT_SYSTEM_FIELDS.flatMap((field) => {
+    const column = finalHeaders.findIndex((header) => headerToField(String(header ?? "")) === field);
+    return column >= 0 ? [column] : [];
+  });
+  await hideSystemColumns(client, finalSheet?.sheetId ?? currentSheet.sheetId, hiddenIndexes);
 }
 
 async function refreshProductColumnIndexes(client: sheets_v4.Sheets) {
@@ -358,17 +421,18 @@ async function refreshProductColumnIndexes(client: sheets_v4.Sheets) {
   const values = await readRange(client, `'${productsSheetTitle}'!A1:${columnLetter(sheet.columnCount)}1`);
   const headers = values[0] ?? [];
   const used = new Set<number>();
-  const refreshed = PRODUCT_FIELDS.map((field) => {
+  const sheetIndexes = new Map<ProductField, number>();
+  PRODUCT_SHEET_FIELDS.forEach((field) => {
     const column = headers.findIndex(
       (header, index) => headerToField(String(header ?? "")) === field && !used.has(index),
     );
     if (column < 0) {
-      throw new SheetsError(`Google Sheets başlığında "${PRODUCT_HEADERS[PRODUCT_FIELDS.indexOf(field)]}" kolonu bulunamadı.`);
+      throw new SheetsError(`Google Sheets başlığında "${sheetHeaderForField(field as ProductField)}" kolonu bulunamadı.`);
     }
     used.add(column);
-    return column;
+    sheetIndexes.set(field as ProductField, column);
   });
-  productColumnIndexes = refreshed;
+  productColumnIndexes = PRODUCT_FIELDS.map((field) => sheetIndexes.get(field) ?? -1);
 }
 
 function columnLetter(index: number): string {
@@ -410,7 +474,8 @@ function mapRow(row: unknown[], rowNumber: number): ProductRecord {
   const product = emptyProduct();
   product.rowNumber = rowNumber;
   PRODUCT_FIELDS.forEach((field, index) => {
-    const raw = row[productColumnIndexes[index]];
+    const column = productColumnIndexes[index];
+    const raw = column >= 0 ? row[column] : "";
     product[field] = field === "barkodNo" || field === "koliDisBarkodNo"
       ? normalizeBarcode(raw)
       : String(raw ?? "").trim();
@@ -433,10 +498,10 @@ async function verifyProductRows(client: sheets_v4.Sheets, products: ProductReco
     });
     chunk.forEach((expected, index) => {
       const actual = mapRow(response.data.valueRanges?.[index]?.values?.[0] ?? [], expected.rowNumber);
-      for (const [fieldIndex, field] of PRODUCT_FIELDS.entries()) {
+      for (const field of PRODUCT_SHEET_FIELDS) {
         if (String(actual[field] ?? "") !== String(expected[field] ?? "")) {
           throw new SheetsError(
-            `Google Sheets kaydı doğrulanamadı: "${PRODUCT_HEADERS[fieldIndex]}" alanı yazılan değerle eşleşmiyor.`,
+            `Google Sheets kaydı doğrulanamadı: "${sheetHeaderForField(field as ProductField)}" alanı yazılan değerle eşleşmiyor.`,
           );
         }
       }
@@ -471,8 +536,10 @@ export async function readAllProducts(force = false): Promise<ProductRecord[]> {
 
 export function productToRow(product: ProductRecord): string[] {
   const row = Array.from({ length: Math.max(...productColumnIndexes) + 1 }, () => "");
-  PRODUCT_FIELDS.forEach((field, index) => {
-    row[productColumnIndexes[index]] = product[field] ?? "";
+  PRODUCT_SHEET_FIELDS.forEach((field) => {
+    const fieldIndex = PRODUCT_FIELDS.indexOf(field as ProductField);
+    const column = productColumnIndexes[fieldIndex];
+    if (column >= 0) row[column] = product[field as ProductField] ?? "";
   });
   return row;
 }
@@ -518,8 +585,8 @@ export async function updateProductRows(products: ProductRecord[]) {
     const client = await sheets();
     await refreshProductColumnIndexes(client);
     const data = products.flatMap((product) => {
-      const cells = PRODUCT_FIELDS.map((field, index) => ({
-        column: productColumnIndexes[index],
+      const cells = PRODUCT_SHEET_FIELDS.map((field) => ({
+        column: productColumnIndexes[PRODUCT_FIELDS.indexOf(field as ProductField)],
         value: product[field] ?? "",
       })).sort((a, b) => a.column - b.column);
       const ranges: { range: string; values: string[][] }[] = [];

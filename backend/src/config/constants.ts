@@ -1,9 +1,8 @@
 export const PRODUCT_HEADERS = [
   "Ürün / İç Barkod No",
-  "Koli Dış Barkod No",
   "Ürün Adı",
+  "Koli Dış Barkod No",
   "Ana Kategori",
-  "Alt Kategori",
   "Marka",
   "Üretici Ürün Kodu",
   "Stok Kodu",
@@ -14,15 +13,30 @@ export const PRODUCT_HEADERS = [
   "Paket İçi Adet",
   "Koli İçi Paket",
   "Birim",
-  "Mevcut Stok",
-  "Minimum Stok",
   "Depo Konumu",
-  "Alış Fiyatı",
-  "Satış Fiyatı",
-  "Kayıt Tarihi",
-  "Güncelleme Tarihi",
-  "Açıklama",
 ] as const;
+
+export const PRODUCT_FORM_FIELDS = [
+  "barkodNo",
+  "urunAdi",
+  "koliDisBarkodNo",
+  "anaKategori",
+  "marka",
+  "urunKodu",
+  "stokKodu",
+  "malzeme",
+  "olcu",
+  "hacim",
+  "renk",
+  "paketIciAdet",
+  "koliIciPaket",
+  "birim",
+  "rafKonum",
+] as const;
+
+export const PRODUCT_SYSTEM_FIELDS = ["kayitTarihi", "guncellemeTarihi"] as const;
+export const PRODUCT_SYSTEM_HEADERS = ["Kayıt Tarihi", "Güncelleme Tarihi"] as const;
+export const PRODUCT_SHEET_FIELDS = [...PRODUCT_FORM_FIELDS, ...PRODUCT_SYSTEM_FIELDS] as const;
 
 export const PRODUCT_FIELDS = [
   "barkodNo",
