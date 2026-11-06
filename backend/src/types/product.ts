@@ -13,6 +13,7 @@ export const productSchema = z.object({
   urunAdi: z.string().min(1, "Ürün adı zorunludur"),
   anaKategori: z.string().min(1, "Ana kategori zorunludur"),
   altKategori: optionalText,
+  disKutuBoyutu: optionalText,
   marka: optionalText,
   urunKodu: optionalText,
   stokKodu: optionalText,

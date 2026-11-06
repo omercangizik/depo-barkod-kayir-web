@@ -2,6 +2,7 @@ import type { sheets_v4 } from "googleapis";
 import {
   CATEGORIES_SHEET_TITLE,
   DEFAULT_CATEGORIES,
+  DEFAULT_SUBCATEGORIES,
   LEGACY_CATEGORY_MAP,
   PRODUCT_FIELDS,
   PRODUCT_FORM_FIELDS,
@@ -163,13 +164,17 @@ async function ensureCategorySheet(client: sheets_v4.Sheets, metas: SheetMeta[])
     Object.entries(LEGACY_CATEGORY_MAP).map(([oldName, newName]) => [normalizeHeader(oldName), newName]),
   );
   const normalizedMain = (value: string) => normalizedLegacy.get(normalizeHeader(value)) ?? value;
-  const normalizedRows: string[][] = DEFAULT_CATEGORIES.map((name) => [name, ""]);
-  const presentRows = new Set(normalizedRows.map((row) => `${normalizeHeader(row[0])}|`));
+  const normalizedRows: string[][] = DEFAULT_CATEGORIES.flatMap((name) => [
+    [name, ""],
+    ...(DEFAULT_SUBCATEGORIES[name] ?? []).map((subcategory) => [name, subcategory]),
+  ]);
+  const presentRows = new Set(normalizedRows.map((row) => `${normalizeHeader(row[0])}|${normalizeHeader(row[1])}`));
   for (const row of existingRows) {
     const oldMain = String(row[0] ?? "").trim();
     const subcategory = String(row[1] ?? "").trim();
     if (!oldMain) continue;
     const main = normalizedMain(oldMain);
+    if (!DEFAULT_CATEGORIES.some((category) => normalizeHeader(category) === normalizeHeader(main))) continue;
     const key = `${normalizeHeader(main)}|${normalizeHeader(subcategory)}`;
     if (!presentRows.has(key)) {
       normalizedRows.push([main, subcategory]);

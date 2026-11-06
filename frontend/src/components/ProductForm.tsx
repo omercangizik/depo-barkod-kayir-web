@@ -4,6 +4,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   DEFAULT_CATEGORIES,
+  DEFAULT_SUBCATEGORIES,
   FIELD_LABELS,
   emptyProduct,
   type Product,
@@ -17,6 +18,8 @@ const schema = z.object({
   urunAdi: z.string().trim().min(1, "Ürün adı zorunludur"),
   koliDisBarkodNo: z.string().optional().default(""),
   anaKategori: z.string().trim().min(1, "Ana kategori zorunludur"),
+  altKategori: z.string().optional().default(""),
+  disKutuBoyutu: z.string().optional().default(""),
   marka: z.string().optional().default(""),
   urunKodu: z.string().optional().default(""),
   stokKodu: z.string().optional().default(""),
@@ -39,7 +42,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 const FORM_FIELDS = [
-  "barkodNo", "urunAdi", "koliDisBarkodNo", "anaKategori", "marka", "urunKodu", "stokKodu",
+  "barkodNo", "urunAdi", "koliDisBarkodNo", "anaKategori", "altKategori", "disKutuBoyutu", "marka", "urunKodu", "stokKodu",
   "malzeme", "olcu", "hacim", "renk", "paketIciAdet", "koliIciPaket", "birim", "rafKonum",
 ] as const satisfies readonly ProductField[];
 type FormField = (typeof FORM_FIELDS)[number];
@@ -51,6 +54,8 @@ const FIELD_HELP: Record<FormField, string> = {
   urunAdi: "Marka ve özellikleriyle yazın. Örn: 500 CC Sızdırmaz Kap",
   koliDisBarkodNo: "Dış kolinin farklı barkodu varsa girin. İsteğe bağlıdır.",
   anaKategori: "Ürünün ait olduğu ana grubu seçin.",
+  altKategori: "Seçtiğiniz ana gruba uygun alt kategoriyi seçin. İsteğe bağlıdır.",
+  disKutuBoyutu: "Dış kolinin ölçüsünü girin. Örn: 40 × 30 × 25 cm",
   marka: "Listeden seçin veya yeni bir marka yazın.",
   urunKodu: "Üreticinin ürüne verdiği kodu girin.",
   stokKodu: "İşletmenizin ürün için kullandığı stok kodu.",
@@ -74,6 +79,9 @@ export function ProductForm({ mode, initial, onSaved }: Props) {
   const [formMode, setFormMode] = useState(mode);
   const [activeProduct, setActiveProduct] = useState(initial);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [subcategories, setSubcategories] = useState<{ anaKategori: string; altKategori: string }[]>(
+    Object.entries(DEFAULT_SUBCATEGORIES).flatMap(([anaKategori, values]) => values.map((altKategori) => ({ anaKategori, altKategori }))),
+  );
   const [options, setOptions] = useState<Partial<Record<FormField, string[]>>>({});
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const original = useMemo(() => ({ ...activeProduct }), [activeProduct]);
@@ -87,7 +95,13 @@ export function ProductForm({ mode, initial, onSaved }: Props) {
   }, [activeProduct, form]);
 
   useEffect(() => {
-    apiClient.categories().then((res) => setCategories(res.data.data.anaKategoriler)).catch(() => setCategories(DEFAULT_CATEGORIES));
+    apiClient.categories().then((res) => {
+      setCategories(res.data.data.anaKategoriler);
+      setSubcategories(res.data.data.altKategoriler);
+    }).catch(() => {
+      setCategories(DEFAULT_CATEGORIES);
+      setSubcategories(Object.entries(DEFAULT_SUBCATEGORIES).flatMap(([anaKategori, values]) => values.map((altKategori) => ({ anaKategori, altKategori }))));
+    });
     apiClient.productOptions().then((res) => setOptions(res.data.data)).catch(() => setOptions({}));
   }, []);
 
@@ -138,6 +152,10 @@ export function ProductForm({ mode, initial, onSaved }: Props) {
     const disabled = formMode === "edit" && field === "barkodNo";
     const registration = form.register(field);
     const common = "w-full rounded-xl border border-slate-300 bg-white px-3 py-3 outline-none focus:border-navy";
+    const availableSubcategories = subcategories
+      .filter((item) => item.anaKategori === form.watch("anaKategori"))
+      .map((item) => item.altKategori);
+    const currentSubcategory = form.watch("altKategori");
     return (
       <label key={field} className="block">
         <span className="mb-1 block text-sm font-medium text-slate-700">
@@ -145,9 +163,20 @@ export function ProductForm({ mode, initial, onSaved }: Props) {
           {required && <span className="text-red-600"> *</span>}
         </span>
         {field === "anaKategori" ? (
-          <select className={common} {...registration} disabled={disabled}>
+          <select className={common} {...registration} disabled={disabled} onChange={(event) => {
+            registration.onChange(event);
+            form.setValue("altKategori", "");
+          }}>
             <option value="">Seçin</option>
             {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+          </select>
+        ) : field === "altKategori" ? (
+          <select className={common} {...registration} disabled={disabled || !form.watch("anaKategori")}>
+            <option value="">Alt kategori seçin (isteğe bağlı)</option>
+            {currentSubcategory && !availableSubcategories.includes(currentSubcategory) && (
+              <option value={currentSubcategory}>{currentSubcategory}</option>
+            )}
+            {availableSubcategories.map((subcategory) => <option key={subcategory} value={subcategory}>{subcategory}</option>)}
           </select>
         ) : (
           <input
