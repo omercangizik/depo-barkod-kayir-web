@@ -33,6 +33,11 @@ export const apiClient = {
   productOptions: () => api.get<{ success: boolean; data: Record<"marka" | "malzeme" | "renk" | "birim" | "rafKonum", string[]> }>("/products/options"),
   products: (params: Record<string, string | number | boolean>) =>
     api.get<{ success: boolean; data: PaginatedProducts }>("/products", { params }),
+  saveInventoryCheck: (body: {
+    anaKategoriFiltresi: string;
+    konumFiltresi: string;
+    items: { barkodNo: string; urunAdi: string; anaKategori: string; rafKonum: string; kontrolEdildi: boolean }[];
+  }) => api.post<{ success: boolean; data: { sessionId: string; checkedAt: string; savedCount: number; sheetTitle: string } }>("/inventory-checks", body),
   getByBarcode: (barcode: string) =>
     api.get<{ success: boolean; data: Product }>(`/products/barcode/${encodeURIComponent(barcode)}`),
   createProduct: (body: Product) => api.post<{ success: boolean; data: Product }>("/products", body),

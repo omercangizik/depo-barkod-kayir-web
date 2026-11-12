@@ -7,6 +7,7 @@ const userLinks = [
   { to: "/", label: "Ana Sayfa", icon: "⌂" },
   { to: "/scan", label: "Barkod", icon: "▦" },
   { to: "/products", label: "Ürünler", icon: "☰" },
+  { to: "/inventory", label: "Konum Kontrol", icon: "✓" },
 ];
 const adminLinks = [
   { to: "/import", label: "Aktar", icon: "↑" },
@@ -166,7 +167,7 @@ export function Layout() {
         ) : adminPasswordForm("mobile-admin-password")}
       </div>}
       <nav aria-label="Ana gezinme" className="lg:hidden fixed inset-x-0 bottom-0 z-20 border-t border-orange-100 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgba(124,45,18,0.08)]">
-        <div className="mx-auto grid max-w-xl grid-cols-4">{userLinks.map((link) => (
+        <div className="mx-auto grid max-w-xl grid-cols-5">{userLinks.map((link) => (
           <NavLink key={link.to} to={link.to} end={link.to === "/"} className={({ isActive }) =>
             `flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 px-0.5 py-2 text-center text-[9px] leading-tight sm:text-[11px] ${isActive ? "text-navy font-semibold" : "text-slate-500"}`
           }><span className="text-lg leading-none">{link.icon}</span>{link.label}</NavLink>

@@ -5,6 +5,7 @@ import { CategoriesPage } from "./pages/CategoriesPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ExportPage } from "./pages/ExportPage";
 import { ImportPage } from "./pages/ImportPage";
+import { InventoryCheckPage } from "./pages/InventoryCheckPage";
 import { ProductFormPage } from "./pages/ProductFormPage";
 import { ProductListPage } from "./pages/ProductListPage";
 import { ScanPage } from "./pages/ScanPage";
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/scan" element={<ScanPage />} />
         <Route path="/products" element={<ProductListPage />} />
+        <Route path="/inventory" element={<InventoryCheckPage />} />
         <Route path="/products/new" element={<ProductFormPage mode="create" />} />
         <Route path="/products/:barcode" element={<ProductFormPage mode="edit" />} />
         <Route path="/import" element={<MenuPasswordGate title="Aktar"><ImportPage /></MenuPasswordGate>} />

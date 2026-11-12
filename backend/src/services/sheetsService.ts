@@ -19,7 +19,7 @@ import { SheetsError } from "../utils/errors.js";
 import { headerToField, normalizeBarcode, normalizeHeader } from "../utils/text.js";
 import { getSheetsClient } from "./sheetsAuth.js";
 
-type SheetMeta = { title: string; sheetId: number; columnCount: number };
+type SheetMeta = { title: string; sheetId: number; columnCount: number; rowCount: number };
 
 let cachedProducts: { rows: ProductRecord[]; loadedAt: number } | null = null;
 const CACHE_MS = 2500;
@@ -89,6 +89,7 @@ async function listSheets(client: sheets_v4.Sheets): Promise<SheetMeta[]> {
         title: s.properties?.title ?? "",
         sheetId: s.properties?.sheetId ?? 0,
         columnCount: s.properties?.gridProperties?.columnCount ?? 26,
+        rowCount: s.properties?.gridProperties?.rowCount ?? 1000,
       }))
       .filter((s) => s.title) ?? []
   );
@@ -673,6 +674,102 @@ export async function appendSubcategory(anaKategori: string, altKategori: string
       requestBody: { values: [[anaKategori, altKategori]] },
     });
   } catch (err) {
+    wrapSheetsError(err);
+  }
+}
+
+export type InventoryCheckRow = {
+  barkodNo: string;
+  urunAdi: string;
+  anaKategori: string;
+  rafKonum: string;
+  kontrolEdildi: boolean;
+};
+
+const INVENTORY_CHECKS_SHEET_TITLE = "Konum Kontrol";
+const INVENTORY_CHECK_HEADERS = [
+  "Kontrol Oturum No",
+  "Kontrol Tarihi",
+  "Kategori Filtresi",
+  "Konum Filtresi",
+  "Ürün / İç Barkod No",
+  "Ürün Adı",
+  "Ana Kategori",
+  "Depo Konumu",
+  "Kontrol Edildi",
+];
+
+export async function appendInventoryCheck(input: {
+  sessionId: string;
+  anaKategoriFiltresi: string;
+  konumFiltresi: string;
+  items: InventoryCheckRow[];
+}) {
+  if (!input.items.length) throw new SheetsError("Kaydetmek için listede ürün bulunmuyor.");
+  try {
+    const client = await sheets();
+    let metas = await listSheets(client);
+    let sheet = metas.find((meta) => normalizeHeader(meta.title) === normalizeHeader(INVENTORY_CHECKS_SHEET_TITLE));
+    if (!sheet) {
+      await addSheet(client, INVENTORY_CHECKS_SHEET_TITLE);
+      metas = await listSheets(client);
+      sheet = metas.find((meta) => normalizeHeader(meta.title) === normalizeHeader(INVENTORY_CHECKS_SHEET_TITLE));
+    }
+    if (!sheet) throw new SheetsError("Konum kontrol sekmesi oluşturulamadı.");
+
+    const headerValues = await readRange(client, `'${sheet.title}'!A1:I1`);
+    const actualHeaders = (headerValues[0] ?? []).map((value) => String(value ?? "").trim());
+    if (!actualHeaders.some(Boolean)) {
+      await client.spreadsheets.values.update({
+        spreadsheetId: env.spreadsheetId,
+        range: `'${sheet.title}'!A1:I1`,
+        valueInputOption: "RAW",
+        requestBody: { values: [INVENTORY_CHECK_HEADERS] },
+      });
+    } else if (INVENTORY_CHECK_HEADERS.some((header, index) => normalizeHeader(actualHeaders[index] ?? "") !== normalizeHeader(header))) {
+      throw new SheetsError(`"${INVENTORY_CHECKS_SHEET_TITLE}" sekmesinin başlıkları beklenen yapıyla eşleşmiyor.`);
+    }
+
+    const previousRows = await readRange(client, `'${sheet.title}'!A:A`);
+    const neededRows = previousRows.length + input.items.length;
+    if (neededRows > sheet.rowCount) {
+      await client.spreadsheets.batchUpdate({
+        spreadsheetId: env.spreadsheetId,
+        requestBody: {
+          requests: [{
+            updateSheetProperties: {
+              properties: { sheetId: sheet.sheetId, gridProperties: { rowCount: neededRows + 100 } },
+              fields: "gridProperties.rowCount",
+            },
+          }],
+        },
+      });
+    }
+
+    const checkedAt = new Date().toISOString();
+    const rows = input.items.map((item) => [
+      input.sessionId,
+      checkedAt,
+      input.anaKategoriFiltresi,
+      input.konumFiltresi,
+      item.barkodNo,
+      item.urunAdi,
+      item.anaKategori,
+      item.rafKonum,
+      item.kontrolEdildi ? "Evet" : "Hayır",
+    ]);
+    for (let offset = 0; offset < rows.length; offset += 500) {
+      await client.spreadsheets.values.append({
+        spreadsheetId: env.spreadsheetId,
+        range: `'${sheet.title}'!A:I`,
+        valueInputOption: "RAW",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: { values: rows.slice(offset, offset + 500) },
+      });
+    }
+    return { sessionId: input.sessionId, checkedAt, savedCount: rows.length, sheetTitle: sheet.title };
+  } catch (err) {
+    if (err instanceof SheetsError) throw err;
     wrapSheetsError(err);
   }
 }

@@ -9,6 +9,7 @@ import { env } from "./config/env.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { categoriesRouter } from "./routes/categories.js";
 import { healthRouter } from "./routes/health.js";
+import { inventoryChecksRouter } from "./routes/inventoryChecks.js";
 import { productsRouter } from "./routes/products.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -78,6 +79,7 @@ export function createApp() {
   });
   app.use("/api/products", productsRouter);
   app.use("/api/categories", categoriesRouter);
+  app.use("/api/inventory-checks", inventoryChecksRouter);
   app.get("/health", (_req, res) => {
     res.json({ success: true, data: { api: true } });
   });
