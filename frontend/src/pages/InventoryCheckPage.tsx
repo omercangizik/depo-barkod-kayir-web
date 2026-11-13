@@ -6,22 +6,41 @@ import { apiClient, getErrorMessage } from "../services/api";
 import { emptyProduct, type Product } from "../types/product";
 
 const CHECKS_KEY = "ozturk-depo-location-checks-v1";
+const CHECKS_DRAFT_KEY = "ozturk-depo-location-checks-draft-v1";
+const FILTERS_KEY = "ozturk-depo-location-check-filters-v1";
 
-function readChecks(): Record<string, boolean> {
+function readChecks(key = CHECKS_KEY): Record<string, boolean> {
   try {
-    return JSON.parse(localStorage.getItem(CHECKS_KEY) ?? "{}") as Record<string, boolean>;
+    return JSON.parse(localStorage.getItem(key) ?? "{}") as Record<string, boolean>;
   } catch {
     return {};
   }
 }
 
+function readFilters() {
+  try {
+    const value = JSON.parse(localStorage.getItem(FILTERS_KEY) ?? sessionStorage.getItem(FILTERS_KEY) ?? "{}") as Partial<{ category: string; location: string; search: string }>;
+    return { category: value.category ?? "", location: value.location ?? "", search: value.search ?? "" };
+  } catch {
+    return { category: "", location: "", search: "" };
+  }
+}
+
 export function InventoryCheckPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [category, setCategory] = useState("");
-  const [location, setLocation] = useState("");
-  const [search, setSearch] = useState("");
+  const [initialFilters] = useState(readFilters);
+  const [category, setCategory] = useState(initialFilters.category);
+  const [location, setLocation] = useState(initialFilters.location);
+  const [search, setSearch] = useState(initialFilters.search);
   const [savedChecks, setSavedChecks] = useState<Record<string, boolean>>(readChecks);
-  const [checks, setChecks] = useState<Record<string, boolean>>(readChecks);
+  const [checks, setChecks] = useState<Record<string, boolean>>(() => {
+    try {
+      const draft = localStorage.getItem(CHECKS_DRAFT_KEY);
+      return draft ? JSON.parse(draft) as Record<string, boolean> : readChecks();
+    } catch {
+      return readChecks();
+    }
+  });
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [newProduct, setNewProduct] = useState<Product>(emptyProduct);
   const [saveMessage, setSaveMessage] = useState("");
@@ -55,6 +74,24 @@ export function InventoryCheckPage() {
   useEffect(() => {
     void loadProducts();
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHECKS_DRAFT_KEY, JSON.stringify(checks));
+    } catch {
+      // Keep in-memory selections if this browser blocks local storage.
+    }
+  }, [checks]);
+
+  useEffect(() => {
+    try {
+      const filters = JSON.stringify({ category, location, search });
+      localStorage.setItem(FILTERS_KEY, filters);
+      sessionStorage.setItem(FILTERS_KEY, filters);
+    } catch {
+      // Filters still work for the current visit when session storage is unavailable.
+    }
+  }, [category, location, search]);
 
   const categories = useMemo(
     () => [...new Set(products.map((product) => product.anaKategori.trim()).filter(Boolean))]
@@ -130,15 +167,42 @@ export function InventoryCheckPage() {
   }
 
   function toggleCheck(barcode: string) {
-    setChecks((current) => ({ ...current, [barcode]: !current[barcode] }));
+    const next = { ...checks, [barcode]: !checks[barcode] };
+    setChecks(next);
+    try {
+      localStorage.setItem(CHECKS_DRAFT_KEY, JSON.stringify(next));
+    } catch {
+      // Keep the selection in memory if browser storage is unavailable.
+    }
   }
 
   function clearVisibleChecks() {
-    setChecks((current) => {
-      const next = { ...current };
-      filteredProducts.forEach((product) => delete next[product.barkodNo]);
-      return next;
-    });
+    const next = { ...checks };
+    filteredProducts.forEach((product) => delete next[product.barkodNo]);
+    setChecks(next);
+    try {
+      localStorage.setItem(CHECKS_DRAFT_KEY, JSON.stringify(next));
+    } catch {
+      // Keep the updated selection in memory if browser storage is unavailable.
+    }
+  }
+
+  function updateFilters(next: { category?: string; location?: string; search?: string }) {
+    const filters = {
+      category: next.category ?? category,
+      location: next.location ?? location,
+      search: next.search ?? search,
+    };
+    try {
+      const serialized = JSON.stringify(filters);
+      localStorage.setItem(FILTERS_KEY, serialized);
+      sessionStorage.setItem(FILTERS_KEY, serialized);
+    } catch {
+      // Filtering stays active in memory if storage is unavailable.
+    }
+    if (next.category !== undefined) setCategory(next.category);
+    if (next.location !== undefined) setLocation(next.location);
+    if (next.search !== undefined) setSearch(next.search);
   }
 
   return (
@@ -156,15 +220,15 @@ export function InventoryCheckPage() {
       {error && <Alert type="error">{error}</Alert>}
 
       <div className="grid gap-2 rounded-2xl bg-white p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
-        <select aria-label="Kategoriye göre filtrele" value={category} onChange={(event) => setCategory(event.target.value)} className="min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-3">
+        <select aria-label="Kategoriye göre filtrele" value={category} onChange={(event) => updateFilters({ category: event.target.value })} className="min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-3">
           <option value="">Tüm kategoriler</option>
           {categories.map((value) => <option key={value} value={value}>{value}</option>)}
         </select>
-        <select aria-label="Konuma göre filtrele" value={location} onChange={(event) => setLocation(event.target.value)} className="min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-3">
+        <select aria-label="Konuma göre filtrele" value={location} onChange={(event) => updateFilters({ location: event.target.value })} className="min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-3">
           <option value="">Tüm konumlar</option>
           {locations.map((value) => <option key={value} value={value}>{value}</option>)}
         </select>
-        <input aria-label="Ürün ara" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Ürün adı veya barkod ara" className="min-w-0 rounded-xl border border-slate-300 px-3 py-3" />
+        <input aria-label="Ürün ara" value={search} onChange={(event) => updateFilters({ search: event.target.value })} placeholder="Ürün adı veya barkod ara" className="min-w-0 rounded-xl border border-slate-300 px-3 py-3" />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -184,7 +248,7 @@ export function InventoryCheckPage() {
           <article key={product.barkodNo} className={`rounded-2xl border bg-white p-4 shadow-sm ${checks[product.barkodNo] ? "border-green-300" : "border-slate-100"}`}>
             <div className="flex items-start gap-3">
               <input aria-label={`${product.urunAdi} kontrol edildi`} type="checkbox" checked={Boolean(checks[product.barkodNo])} onChange={() => toggleCheck(product.barkodNo)} className="mt-1 h-5 w-5 shrink-0 accent-green-700" />
-              <button type="button" onClick={() => navigate(`/products/${encodeURIComponent(product.barkodNo)}`)} className="min-w-0 flex-1 text-left">
+              <button type="button" onClick={() => navigate(`/products/${encodeURIComponent(product.barkodNo)}`, { state: { returnTo: "/inventory" } })} className="min-w-0 flex-1 text-left">
                 <span className="block font-semibold text-slate-900">{product.urunAdi || "İsimsiz ürün"}</span>
                 <span className="mt-1 block text-sm text-slate-500">Barkod: {product.barkodNo || "-"}</span>
                 <span className="mt-2 block text-sm text-slate-700">{product.anaKategori || "Kategorisiz"}{product.altKategori ? ` · ${product.altKategori}` : ""}</span>
@@ -201,7 +265,7 @@ export function InventoryCheckPage() {
             <th className="px-4 py-3">Kontrol</th><th className="px-4 py-3">Ürün Adı</th><th className="px-4 py-3">Barkod</th><th className="px-4 py-3">Kategori</th><th className="px-4 py-3">Konum</th>
           </tr></thead>
           <tbody>{filteredProducts.map((product) => (
-            <tr key={product.barkodNo} className="cursor-pointer border-t border-slate-100 hover:bg-orange-50/40" onClick={() => navigate(`/products/${encodeURIComponent(product.barkodNo)}`)}>
+            <tr key={product.barkodNo} className="cursor-pointer border-t border-slate-100 hover:bg-orange-50/40" onClick={() => navigate(`/products/${encodeURIComponent(product.barkodNo)}`, { state: { returnTo: "/inventory" } })}>
               <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}><input aria-label={`${product.urunAdi} kontrol edildi`} type="checkbox" checked={Boolean(checks[product.barkodNo])} onChange={() => toggleCheck(product.barkodNo)} className="h-5 w-5 accent-green-700" /></td>
               <td className="px-4 py-3 font-medium">{product.urunAdi || "İsimsiz ürün"}</td><td className="px-4 py-3 font-mono">{product.barkodNo || "-"}</td><td className="px-4 py-3">{product.anaKategori || "-"}{product.altKategori ? ` · ${product.altKategori}` : ""}</td><td className="px-4 py-3">{product.rafKonum || "Konum girilmemiş"}</td>
             </tr>

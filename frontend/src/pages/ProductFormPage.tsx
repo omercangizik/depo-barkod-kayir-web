@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ProductForm } from "../components/ProductForm";
 import { Alert } from "../components/Alert";
 import { apiClient, getErrorMessage } from "../services/api";
@@ -9,6 +9,8 @@ export function ProductFormPage({ mode }: { mode: "create" | "edit" }) {
   const { barcode } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo;
   const [product, setProduct] = useState<Product | null>(null);
   const [error, setError] = useState("");
 
@@ -60,13 +62,18 @@ export function ProductFormPage({ mode }: { mode: "create" | "edit" }) {
 
   return (
     <div className="space-y-4">
+      {returnTo === "/inventory" && (
+        <button type="button" onClick={() => navigate(returnTo)} className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">
+          ← Kontrol ekranına dön
+        </button>
+      )}
       <h1 className="text-2xl font-bold text-navy-dark">
         {mode === "create" ? "Yeni Ürün" : "Ürünü Düzenle"}
       </h1>
       <ProductForm
         mode={mode}
         initial={product}
-        onSaved={(saved) => navigate(`/products/${encodeURIComponent(saved.barkodNo)}`)}
+        onSaved={(saved) => navigate(returnTo === "/inventory" ? returnTo : `/products/${encodeURIComponent(saved.barkodNo)}`, { replace: returnTo === "/inventory" })}
       />
     </div>
   );
